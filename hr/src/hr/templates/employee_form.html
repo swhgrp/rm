@@ -952,10 +952,14 @@ document.getElementById('employeeForm').addEventListener('submit', async functio
                 await uploadRequiredDocuments(employee.id);
             } catch (docError) {
                 console.error('Error uploading documents:', docError);
-                showAlert(`Employee created but some documents failed to upload: ${docError.message}`, 'warning');
-                setTimeout(() => {
-                    window.location.href = `/hr/employees/${employee.id}`;
-                }, 2000);
+                showAlert(
+                    `Employee created but documents failed to upload: ${docError.message}. ` +
+                    `Please upload the required documents from the employee detail page.`,
+                    'danger'
+                );
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Documents Failed — Click to Go to Employee';
+                submitBtn.onclick = () => { window.location.href = `/hr/employees/${employee.id}`; };
                 return;
             }
         }

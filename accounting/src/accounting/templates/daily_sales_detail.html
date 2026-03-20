@@ -1878,6 +1878,29 @@ async function postDSS() {
         return;
     }
 
+    // Validate all lines have GL accounts assigned
+    const errors = [];
+    categoryLines.forEach(line => {
+        if (!line.revenue_account_id) {
+            errors.push(`Sales category "${line.category}" has no GL account assigned`);
+        }
+    });
+    paymentLines.forEach(line => {
+        if (!line.deposit_account_id) {
+            errors.push(`Payment method "${line.payment_type}" has no GL account assigned`);
+        }
+    });
+    discountLines.forEach(line => {
+        if (!line.discount_account_id) {
+            errors.push(`Discount "${line.discount_name}" has no GL account assigned`);
+        }
+    });
+
+    if (errors.length > 0) {
+        showNotification('Cannot post — fix the following:\n\n• ' + errors.join('\n• '), 'Validation Error');
+        return;
+    }
+
     try {
         // Build account mappings
         const categoryMapping = {};
@@ -1990,10 +2013,9 @@ async function postDSS() {
 
         dss = await response.json();
         showNotification('Sales summary posted successfully! Journal entry created.', 'Success');
-        updateUI();
 
-        // Reload to show JE
-        setTimeout(() => location.reload(), 1500);
+        // Redirect back to DDS list page
+        setTimeout(() => window.location.href = '/accounting/daily-sales', 1500);
 
     } catch (error) {
         console.error('Error posting DSS:', error);

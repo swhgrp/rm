@@ -540,6 +540,14 @@ class InvoiceParser:
                     "message": "Failed to extract invoice data"
                 }
 
+            # Fix AI outputting math expressions instead of numbers (e.g., "8.33 / 45")
+            import re
+            result_text = re.sub(
+                r':\s*(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)',
+                lambda m: f': {round(float(m.group(1)) / float(m.group(2)), 6)}',
+                result_text
+            )
+
             parsed_data = json.loads(result_text)
 
             # Calculate confidence score based on how many fields were found
@@ -560,6 +568,7 @@ class InvoiceParser:
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse AI response as JSON: {str(e)}")
+            logger.error(f"Raw AI response text (first 2000 chars): {result_text[:2000]}")
             return {
                 "success": False,
                 "error": f"Failed to parse AI response as JSON: {str(e)}",
@@ -888,8 +897,8 @@ class InvoiceParser:
                         JOIN vendors v ON v.id = vi.vendor_id
                         WHERE v.name ILIKE :vendor_pattern AND vi.is_active = true
                     """), {"vendor_pattern": f"%{base_vendor}%"}).fetchall()
-                except Exception as e:
-                    logger.warning(f"Could not query inventory DB for description matching: {e}")
+            except Exception as e:
+                logger.warning(f"Could not query inventory DB for description matching: {e}")
 
             # Source 2: Hub vendor items (fallback when Inventory has no items for this vendor)
             if not inv_items and hub_vendor_id:
@@ -1461,11 +1470,21 @@ class InvoiceParser:
                     # Auto-map items
                     try:
                         from integration_hub.services.auto_mapper import get_auto_mapper
-                        mapper = get_auto_mapper()
-                        mapping_result = mapper.map_invoice_items(invoice_id, db)
+                        mapper = get_auto_mapper(db)
+                        mapping_result = mapper.map_invoice_items(invoice_id)
                         logger.info(f"Auto-mapped CSV-sourced items for invoice {invoice_id}: {mapping_result}")
                     except Exception as e:
                         logger.error(f"Error auto-mapping after CSV import: {e}")
+
+                    # Post-parse validation: sanity checks + total reconciliation
+                    try:
+                        from integration_hub.services.post_parse_validator import apply_validation_to_invoice
+                        validation_result = apply_validation_to_invoice(invoice_id, db)
+                        logger.info(f"Post-parse validation (CSV sibling) for invoice {invoice_id}: "
+                                   f"flags={validation_result.get('item_validation', {}).get('flags_set', 0)}, "
+                                   f"total_match={validation_result.get('total_validation', {}).get('match', True)}")
+                    except Exception as e:
+                        logger.error(f"Error in post-parse validation after CSV import: {e}")
 
                     return {
                         "success": True,
@@ -1607,6 +1626,27 @@ class InvoiceParser:
             unmapped_count = 0
             line_items = parsed_data.get('line_items', [])
 
+            # Deduplicate items — some PDF formats (e.g., GFS) render items twice
+            # per page (text + table), causing the AI to extract duplicates
+            original_count = len(line_items)
+            if original_count > 0:
+                seen = set()
+                deduped = []
+                for item_data in line_items:
+                    key = (
+                        str(item_data.get('item_code', '')).strip(),
+                        str(item_data.get('quantity', '')).strip(),
+                        str(item_data.get('unit_price', '')).strip(),
+                        str(item_data.get('line_total', '')).strip(),
+                    )
+                    if key not in seen:
+                        seen.add(key)
+                        deduped.append(item_data)
+                if len(deduped) < original_count:
+                    logger.info(f"Deduplicated {original_count - len(deduped)} duplicate items "
+                               f"({original_count} → {len(deduped)})")
+                line_items = deduped
+
             for item_data in line_items:
                 quantity = float(item_data.get('quantity') or 0)
                 unit_price = float(item_data.get('unit_price') or 0)
@@ -1674,6 +1714,35 @@ class InvoiceParser:
             # Set invoice status to mapping
             invoice.status = 'mapping'
             db.commit()
+
+            # Check if CSV is expected for this vendor+location
+            # If so, mark as pdf_reference — items are stored for reference but
+            # no mapping/validation/auto-send happens. CSV will arrive separately.
+            if invoice.vendor_id and invoice.location_id and invoice.source_filename and \
+               invoice.source_filename.lower().endswith('.pdf'):
+                try:
+                    from integration_hub.services.csv_preference import is_csv_expected
+                    if is_csv_expected(invoice.vendor_id, invoice.location_id, db):
+                        invoice.status = 'pdf_reference'
+                        db.commit()
+                        logger.info(f"Invoice {invoice_id} from {invoice.vendor_name} at {invoice.location_name}: "
+                                   f"CSV expected — marked as pdf_reference (items stored for reference)")
+                        return {
+                            "success": True,
+                            "message": f"PDF stored as reference. CSV expected for {invoice.vendor_name} at {invoice.location_name}.",
+                            "invoice_id": invoice_id,
+                            "confidence_score": confidence_score,
+                            "items_parsed": len(line_items),
+                            "items_mapped": 0,
+                            "items_unmapped": len(line_items),
+                            "vendor_matched": vendor is not None,
+                            "vendor_name": parsed_data.get('vendor_name'),
+                            "location_matched": location_matched,
+                            "location_name": parsed_data.get('location_name'),
+                            "pdf_reference": True
+                        }
+                except Exception as e:
+                    logger.error(f"Error checking CSV preference for invoice {invoice_id}: {e}")
 
             # Post-parse validation: sanity checks + total reconciliation
             try:
@@ -1803,8 +1872,10 @@ class InvoiceParser:
             db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).delete()
             logger.info(f"Deleted {existing_count} existing items for re-parse")
 
-        # Update status
+        # Update status and clear old review flags before re-parse
         invoice.status = 'mapping'
+        invoice.needs_review = False
+        invoice.review_reason = None
         db.commit()
 
         try:
@@ -1825,6 +1896,26 @@ class InvoiceParser:
             # Create new invoice items
             unmapped_count = 0
             line_items = parsed_data.get('line_items', [])
+
+            # Deduplicate items — some PDF formats (e.g., GFS) render items twice
+            original_count = len(line_items)
+            if original_count > 0:
+                seen = set()
+                deduped = []
+                for item_data in line_items:
+                    key = (
+                        str(item_data.get('item_code', '')).strip(),
+                        str(item_data.get('quantity', '')).strip(),
+                        str(item_data.get('unit_price', '')).strip(),
+                        str(item_data.get('line_total', '')).strip(),
+                    )
+                    if key not in seen:
+                        seen.add(key)
+                        deduped.append(item_data)
+                if len(deduped) < original_count:
+                    logger.info(f"Deduplicated {original_count - len(deduped)} duplicate items "
+                               f"({original_count} → {len(deduped)})")
+                line_items = deduped
 
             for item_data in line_items:
                 quantity = float(item_data.get('quantity') or 0)
@@ -1874,6 +1965,31 @@ class InvoiceParser:
                     is_mapped=False
                 )
                 db.add(invoice_item)
+                unmapped_count += 1
+
+            # Check for minimum charge adjustment (e.g., Gold Coast Linen)
+            # If invoice subtotal > sum of line items, add a balancing line
+            invoice_subtotal = float(invoice.total_amount or 0) - float(invoice.tax_amount or 0)
+            items_sum = sum(
+                float(item_data.get('line_total') or 0)
+                for item_data in line_items
+            )
+            if invoice_subtotal > 0 and items_sum > 0 and invoice_subtotal > items_sum + 0.05:
+                min_adj = round(invoice_subtotal - items_sum, 2)
+                logger.info(f"Adding minimum charge adjustment: ${min_adj:.2f} "
+                           f"(subtotal ${invoice_subtotal:.2f} - items ${items_sum:.2f})")
+                adj_item = HubInvoiceItem(
+                    invoice_id=invoice_id,
+                    line_number=len(line_items) + 1,
+                    item_description='Minimum Charge Adjustment',
+                    item_code='MIN-ADJ',
+                    quantity=1,
+                    unit_of_measure='EA',
+                    unit_price=min_adj,
+                    total_amount=min_adj,
+                    is_mapped=False
+                )
+                db.add(adj_item)
                 unmapped_count += 1
 
             invoice.status = 'mapping'

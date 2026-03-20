@@ -734,6 +734,35 @@ def post_daily_sales_summary(
             detail=f"Cannot post DSS in status: {dss.status}. Only verified DSS can be posted."
         )
 
+    # Validate all line items have GL accounts before attempting to post
+    errors = []
+    if dss.line_items:
+        for item in dss.line_items:
+            account_id = item.revenue_account_id
+            if not account_id and post_request.category_account_mapping:
+                account_id = post_request.category_account_mapping.get((item.category or "").upper())
+            if not account_id:
+                errors.append(f'Sales category "{item.category or "Unknown"}" has no GL account assigned')
+    if dss.payments:
+        for payment in dss.payments:
+            account_id = payment.deposit_account_id
+            if not account_id and post_request.payment_account_mapping:
+                account_id = post_request.payment_account_mapping.get(payment.payment_type.upper())
+            if not account_id:
+                errors.append(f'Payment method "{payment.payment_type}" has no GL account assigned')
+    if dss.discount_breakdown:
+        from accounting.models.pos import POSDiscountGLMapping
+        for discount_name in dss.discount_breakdown.keys():
+            mapping = db.query(POSDiscountGLMapping).filter(
+                POSDiscountGLMapping.area_id == dss.area_id,
+                POSDiscountGLMapping.pos_discount_name == discount_name,
+                POSDiscountGLMapping.is_active == True
+            ).first()
+            if not mapping or not mapping.discount_account_id:
+                errors.append(f'Discount "{discount_name}" has no GL account assigned')
+    if errors:
+        raise HTTPException(status_code=400, detail="Cannot post: " + "; ".join(errors))
+
     try:
         # Create journal entry
         dss.posted_by = current_user.id

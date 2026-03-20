@@ -334,12 +334,12 @@ class VendorItemReviewService:
         Returns:
             New vendor item dict
         """
-        # Check if already exists
+        # Check if already exists (same vendor + SKU, any location, any status)
+        # Includes inactive items to prevent re-creating intentionally deactivated items
         existing = self.db.query(HubVendorItem).filter(
             and_(
                 HubVendorItem.vendor_id == vendor_id,
                 HubVendorItem.vendor_sku == item_code,
-                HubVendorItem.location_id == location_id
             )
         ).first()
 

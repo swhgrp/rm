@@ -5,7 +5,7 @@ Microservices-based restaurant management platform for SW Hospitality Group.
 - **Production URL:** https://rm.swhgrp.com
 - **Architecture:** 11 FastAPI microservices behind Nginx reverse proxy, each with its own PostgreSQL database
 - **Portal:** Central auth + UI at `/portal/`, serves templates from each service's template directory
-- **Last Updated:** March 14, 2026
+- **Last Updated:** March 20, 2026
 
 ## Infrastructure & Development Environment
 - **Production Server:** Linode Ubuntu instance at `/opt/restaurant-system/`
@@ -201,6 +201,50 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - **UI**: `/portal/accounting/gl-review` page, nav link in accounting sidebar
 - **Migration**: `20260312_0001_add_gl_anomaly_tables.py`
 - **Config**: `GL_REVIEW_AI_MODEL` env var (default: `claude-sonnet-4-6`), requires `ANTHROPIC_API_KEY`
+
+### CSV Expected Vendors & PDF Reference Status (Mar 2026)
+- **CSV expected vendors**: `csv_expected_vendors` table tracks vendor+location combos where CSV invoices are the primary format
+- **`pdf_reference` status**: When a PDF invoice arrives for a CSV-expected vendor, it's stored as reference only (not parsed/mapped)
+- **PDF-to-CSV replacement**: When CSV arrives and a matching PDF invoice exists (same number+location), CSV data replaces the PDF data
+- **Model**: `CsvExpectedVendor` with `vendor_id`, `location_id`, `is_active`, seeded with beverage distributors across all 6 locations
+- **Service**: `csv_preference.py` — `is_csv_expected()` with in-memory caching
+- **UI**: `pdf_reference` status shown as "PDF Reference" badge; grouped under "Statements" tab in invoice list
+- **Migration**: `20260318_0001_add_csv_expected_vendors.py`
+
+### GFS CSV Invoice Parsing (Mar 2026)
+- **Format detection**: `_detect_csv_format()` identifies GFS, Fintech, or statement CSV formats from column headers
+- **GFS column mapping**: `_normalize_gfs_row()` maps GFS columns (`Item Number`, `Item Description`, `Quantity Shipped`, `Case Price`, `Extended Price`) to standard format
+- **Catch-weight handling**: When `Catch Weight == 'Y'`, uses `CW Weight` as quantity instead of `Quantity Shipped`
+- **Location name fallback**: `get_location_by_store_number()` accepts optional `location_name` for substring/fuzzy matching when store code lookup fails
+- **Row deduplication**: Skips duplicate CSV rows based on `(product_number, quantity, unit_price, total)` key
+- **CSV-aware auto-mapping**: `map_item(csv_source=True)` skips near-SKU and fuzzy description matching for CSV data (exact SKUs only)
+- **Near-SKU preserves original**: `apply_mapping()` no longer overwrites parsed `item_code`/`item_description` on near-SKU matches
+
+### Invoice Parser Improvements (Mar 2026)
+- **AI math expression fix**: Post-processes AI responses to evaluate math expressions (e.g., `8.33 / 45`) in JSON values
+- **Line item deduplication**: Deduplicates items based on `(item_code, quantity, unit_price, line_total)` — handles GFS PDFs that render items twice
+- **Minimum charge adjustment**: If invoice subtotal exceeds sum of line items by >$0.05, adds a "Minimum Charge Adjustment" line item (`MIN-ADJ`)
+- **Background parse with vendor rules**: `_parse_invoice_background()` now directly calls `reparse_with_vendor_rules()` if vendor has rules, instead of waiting for email monitor auto-reparse
+- **Review flag reset on re-parse**: `reparse_with_vendor_rules()` clears `needs_review` and `review_reason` before re-parsing
+
+### Post-Parse Validator Improvements (Mar 2026)
+- **Expanded fee patterns**: Added `EMPTY KEG`, `KEG DEPOSIT`, `KEG RETURN`, `POS EMPTY` to fee detection
+- **Fee items exempt from catalog check**: Items matching fee patterns no longer flagged as `unknown_item_code`
+- **Mapped items exempt from review**: Already-mapped items with `unknown_item_code` flag no longer trigger invoice-level `needs_review`
+- **Better review reason format**: Changed from `item_anomaly:<description>` to `item_anomaly:<flag_name>:<description>` for specific UI display
+- **Fresh review reasons on re-validation**: No longer carries over old `review_reason` values
+
+### Vendor Item Duplicate Prevention (Mar 2026)
+- **Cross-location dedup**: `VendorItemReviewService` now checks `(vendor_id, vendor_sku)` across ALL locations and statuses (including inactive)
+- **Prevents re-creating deactivated items**: Previously only checked within same location
+
+### Daily Sales Summary GL Validation (Mar 2026)
+- **Server-side validation**: `post_daily_sales_summary()` validates all category, payment, and discount GL mappings before creating journal entry
+- **Client-side validation**: `postDSS()` JS function checks GL accounts before submitting, displays notification listing missing accounts
+- **Post-success redirect**: After successful DSS post, redirects to `/accounting/daily-sales` list page
+
+### Accounting Vendor Reactivation (Mar 2026)
+- **Inactive vendor reuse**: `VendorService` checks for inactive vendors with matching name before creating duplicates; reactivates if found
 
 ### Integration Hub Connection Pooling (Mar 2026)
 - **Centralized engine management**: `get_inventory_engine()` in `db/database.py` — shared, pooled connection to Inventory DB

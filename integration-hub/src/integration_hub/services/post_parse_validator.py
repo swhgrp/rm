@@ -31,7 +31,8 @@ DESC_MISMATCH_THRESHOLD = 0.3     # Jaccard similarity below this = description 
 FEE_PATTERNS = re.compile(
     r'\b(?:DELIVERY|FUEL\s*SURCHARGE|FREIGHT|DEPOSIT|SERVICE\s*CHARGE|'
     r'HANDLING|ENVIRONMENTAL|RECYCLING|SURCHARGE|CORE\s*CHARGE|'
-    r'BOTTLE\s*DEPOSIT|CRV|SHIPPING|TRANSPORTATION|DISPOSAL)\b',
+    r'BOTTLE\s*DEPOSIT|CRV|SHIPPING|TRANSPORTATION|DISPOSAL|'
+    r'EMPTY\s*KEG|KEG\s*DEPOSIT|KEG\s*RETURN|POS\s*EMPTY)\b',
     re.IGNORECASE
 )
 
@@ -277,12 +278,14 @@ def validate_item_codes_against_catalog(invoice_id: int, db: Session) -> Dict:
         existing_flags = [f for f in (item.validation_flags or '').split(',') if f]
 
         if normalized_code not in catalog:
-            existing_flags.append('unknown_item_code')
-            warnings.append(
-                f"Item '{desc[:40]}': code '{code}' not found in vendor catalog "
-                f"({len(catalog)} known items)"
-            )
-            flags_set += 1
+            # Skip flagging for fee/deposit/surcharge items — they won't be in vendor catalog
+            if not (desc and FEE_PATTERNS.search(desc)):
+                existing_flags.append('unknown_item_code')
+                warnings.append(
+                    f"Item '{desc[:40]}': code '{code}' not found in vendor catalog "
+                    f"({len(catalog)} known items)"
+                )
+                flags_set += 1
         else:
             # Code exists — check if description matches
             catalog_name = catalog[normalized_code]
@@ -331,14 +334,8 @@ def apply_validation_to_invoice(invoice_id: int, db: Session) -> Dict:
     # Run item code catalog check
     catalog_result = validate_item_codes_against_catalog(invoice_id, db)
 
-    # Build review reasons
+    # Build review reasons — start fresh (don't carry over old reasons from prior parse)
     reasons = []
-    if invoice.review_reason:
-        try:
-            reasons = json.loads(invoice.review_reason)
-        except (json.JSONDecodeError, TypeError):
-            reasons = []
-
     needs_review = False
 
     # Flag for total mismatch
@@ -361,16 +358,38 @@ def apply_validation_to_invoice(invoice_id: int, db: Session) -> Dict:
         ).all()
         for item in items:
             flags = set((item.validation_flags or '').split(','))
-            if flags & anomaly_flags:
-                reasons.append(f"item_anomaly:{item.item_description[:30]}")
+            # unknown_item_code on a mapped item is not an anomaly — it just means
+            # the item is an expense or new product not in the vendor catalog
+            effective_flags = flags & anomaly_flags
+            if item.is_mapped and 'unknown_item_code' in effective_flags:
+                effective_flags.discard('unknown_item_code')
+            if effective_flags:
+                flag_name = next(iter(effective_flags))
+                reasons.append(f"item_anomaly:{flag_name}:{item.item_description[:30]}")
                 needs_review = True
                 break  # One is enough to flag the invoice
 
+    invoice.needs_review = needs_review
+    invoice.review_reason = json.dumps(reasons) if reasons else None
+    invoice.line_items_total = total_result.get('line_items_total', invoice.line_items_total)
+
     if needs_review:
-        invoice.needs_review = True
-        invoice.review_reason = json.dumps(reasons)
-        db.commit()
+        invoice.status = 'needs_review'
         logger.info(f"Invoice {invoice_id} flagged for review: {reasons}")
+    else:
+        # If status was needs_review but flags are now cleared, recalculate status
+        if invoice.status == 'needs_review':
+            invoice.status = 'mapping'  # Reset so update_invoice_status can recalculate
+            logger.info(f"Invoice {invoice_id} passed validation — cleared review flags, recalculating status")
+            try:
+                from integration_hub.services.invoice_status import update_invoice_status
+                update_invoice_status(invoice, db)
+            except Exception as e:
+                logger.error(f"Error recalculating status after clearing review: {e}")
+        else:
+            logger.info(f"Invoice {invoice_id} passed validation — cleared review flags")
+
+    db.commit()
 
     return {
         "item_validation": item_result,

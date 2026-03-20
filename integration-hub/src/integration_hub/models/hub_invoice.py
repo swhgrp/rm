@@ -72,6 +72,7 @@ class HubInvoice(Base):
     # 'error' - sync error
     # 'partial' - sent to one system but not other
     # 'needs_review' - all mapped but flagged for human review
+    # 'pdf_reference' - PDF stored for reference only (CSV expected for this vendor+location)
 
     # Post-parse validation
     needs_review = Column(Boolean, default=False, index=True)  # Flagged for human review

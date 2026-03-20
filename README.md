@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** March 14, 2026
+**Last Updated:** March 20, 2026
 **Status:** ~98% Complete - All 11 Systems Production Ready ✅
-**Latest:** GL anomaly detection with AI, event equipment/rental pricing, Hub connection pooling (Mar 14, 2026) ✅
+**Latest:** GFS CSV parsing, PDF reference invoices, DSS GL validation, vendor dedup improvements (Mar 20, 2026) ✅
 
 ---
 
@@ -518,7 +518,7 @@ restaurant-system/
 - **Migrations:** Alembic (23 migrations)
 - **Files:** **119 Python files** (largest system!), 38+ templates, 250+ API endpoints
 - **API Docs:** OpenAPI/Swagger auto-generated
-- **Latest:** GL anomaly review with AI analysis (Mar 14, 2026) 🌟
+- **Latest:** DSS GL validation, inactive vendor reactivation (Mar 20, 2026) 🌟
 
 **Features:**
 
@@ -588,6 +588,10 @@ restaurant-system/
 - 🔄 Variance analysis (partial - 40%)
 - 🔄 Forecasting (minimal implementation - ~30%)
 
+**Daily Sales & Vendor Improvements (Mar 2026):** 🌟
+- ✅ **DSS GL validation** — server-side + client-side validation of all GL account mappings before posting journal entry
+- ✅ **Inactive vendor reactivation** — VendorService reuses inactive vendors with matching name instead of creating duplicates
+
 **GL Review & Anomaly Detection (NEW Mar 2026):** 🌟
 - ✅ **Automated nightly GL sweep** — rules engine + Claude AI anomaly detection
 - ✅ **Statistical baselines** — monthly recompute per GL account
@@ -615,7 +619,7 @@ restaurant-system/
 - **Database:** events_db (PostgreSQL 15)
 - **Technology:** FastAPI, SQLAlchemy, WeasyPrint (PDF), FullCalendar.js
 - **Files:** 55 Python files, 18 templates
-- **Latest:** Equipment/rental line items with pricing, catering contracts, CalDAV sync (Mar 14, 2026) 🌟
+- **Latest:** Equipment/rental line items with pricing, catering contracts, CalDAV sync (Mar 20, 2026) 🌟
 
 **✅ Portal SSO Integration Complete:**
 - ✅ JWT token validation from Portal
@@ -768,6 +772,16 @@ restaurant-system/
 - ✅ **Vendor selection/creation** - Create vendors on-the-fly in invoice detail
 - ✅ **Auto-trigger send** - Automatically sends when invoice fully mapped via bulk action
 - ✅ **Enhanced GL validation** - Different requirements for inventory vs expense items
+
+**🆕 CSV Expected Vendors & GFS Parsing (Mar 2026):** 🌟
+- ✅ **CSV expected vendors** — tracks vendor+location combos where CSV is the primary invoice format
+- ✅ **`pdf_reference` status** — PDF invoices for CSV-expected vendors stored for reference only, replaced when CSV arrives
+- ✅ **GFS CSV format support** — auto-detects GFS column headers, maps to standard format, handles catch-weight items
+- ✅ **CSV-aware auto-mapping** — skips fuzzy matching for CSV data (exact SKUs only, prevents wrong product matches)
+- ✅ **Line item deduplication** — deduplicates items from GFS PDFs that render items twice (text + table)
+- ✅ **AI math expression fix** — evaluates math expressions in AI-parsed JSON values
+- ✅ **Minimum charge adjustment** — auto-adds balancing line item when subtotal exceeds line item sum
+- ✅ **Vendor item cross-location dedup** — prevents re-creating intentionally deactivated vendor items
 
 **🌟 Automated Invoice Intake Pipeline (Oct 31, 2025):**
 - ✅ **Email monitoring** - Automated IMAP email checking every 15 minutes
@@ -1627,7 +1641,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 | Food Safety | ✅ Production | 29 | 5 | 18 | **100%** 🌟 | Incidents, document uploads, user permissions |
 | Cookbook AI | ✅ Production | 12 | 7 | 5 | **100%** 🌟 | RAG cookbook search, AI recipe creation, PDF upload |
 
-**Total:** 510+ Python files, 180+ templates, 165+ database models (verified Mar 9, 2026)
+**Total:** 510+ Python files, 180+ templates, 165+ database models (verified Mar 20, 2026)
 
 **Overall Status:** ~98% Complete - All 11 Systems Production Ready ✅
 
@@ -1645,11 +1659,13 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 - ✅ **Cookbook structured recipes** - Inventory-format recipe output, delete from library, embedding fix (Mar 11, 2026)
 - ✅ **Event price quotes** - Price Quote PDF generation from events (Mar 11, 2026)
 - ✅ **File manager improvements** - Owner-only folders, search enhancements (Mar 11, 2026)
+- ✅ **GFS CSV invoice parsing** — Multi-format CSV support, catch-weight handling, PDF-to-CSV replacement (Mar 20, 2026)
+- ✅ **DSS GL validation** — Server+client-side GL account validation before posting daily sales (Mar 20, 2026)
 
 ---
 
-**Version:** 4.4
-**Last Updated:** March 11, 2026
+**Version:** 4.5
+**Last Updated:** March 20, 2026
 **Maintained By:** SW Hospitality Group Development Team
 
 **For developer reference, see [CLAUDE.md](./CLAUDE.md)**
@@ -1660,7 +1676,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 For detailed development history, see the git log. Key milestones:
 
-- **Mar 2026** — Mobile app (iOS auth + inventory complete), catering contract PDFs, CalDAV item sync, GL learning improvements, count session reports, self-hosted e-signatures
+- **Mar 2026** — GFS CSV parsing, PDF reference invoices, CSV expected vendors, DSS GL validation, vendor reactivation, mobile app (iOS auth + inventory), catering contracts, CalDAV item sync, GL anomaly detection, count session reports, e-signatures
 - **Feb 2026** — UOM simplification (single purchase UOM per vendor item), post-parse invoice validation, food safety incidents, HR required documents, order sheets, vendor item name normalization
 - **Jan 2026** — Maintenance system, food safety system, Plaid bank integration, quick holds, CalDAV sync
 - **Dec 2025** — Location-aware costing architecture, Hub source of truth, AI semantic search, expense/vendor item separation, vendor items pagination

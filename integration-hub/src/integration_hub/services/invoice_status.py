@@ -134,8 +134,8 @@ def update_invoice_status(invoice: HubInvoice, db: Session) -> str:
     Returns:
         The new status string
     """
-    # Don't modify sent, partial, statement, or error status
-    if invoice.status in ['sent', 'partial', 'statement', 'error']:
+    # Don't modify sent, partial, statement, pdf_reference, or error status
+    if invoice.status in ['sent', 'partial', 'statement', 'error', 'pdf_reference']:
         logger.debug(f"Invoice {invoice.id} status '{invoice.status}' not modified (protected status)")
         return invoice.status
 
@@ -307,7 +307,7 @@ def bulk_recalculate_status(db: Session, status_filter: str = None) -> dict:
     query = db.query(HubInvoice)
 
     # Don't touch sent/partial/statement invoices
-    query = query.filter(HubInvoice.status.notin_(['sent', 'partial', 'statement', 'error']))
+    query = query.filter(HubInvoice.status.notin_(['sent', 'partial', 'statement', 'error', 'pdf_reference']))
 
     if status_filter:
         query = query.filter(HubInvoice.status == status_filter)

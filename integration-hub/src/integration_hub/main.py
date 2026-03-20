@@ -911,7 +911,8 @@ async def _send_invoice_background(invoice_id: int):
 
 def _parse_invoice_background(invoice_id: int):
     """
-    Background task to parse invoice without blocking the API response
+    Background task to parse invoice without blocking the API response.
+    Uses vendor-specific parsing rules if available, otherwise falls back to generic parse.
     """
     from integration_hub.services.invoice_parser import get_invoice_parser
     from integration_hub.db.database import SessionLocal
@@ -922,6 +923,17 @@ def _parse_invoice_background(invoice_id: int):
 
     try:
         parser = get_invoice_parser()
+
+        # Check if vendor has parsing rules — use reparse_with_vendor_rules if so
+        invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+        if invoice and invoice.vendor_id:
+            vendor_rules = parser.get_vendor_parsing_rules(invoice.vendor_id, db)
+            if vendor_rules:
+                logger.info(f"Invoice {invoice_id} has vendor rules — using reparse_with_vendor_rules")
+                result = parser.reparse_with_vendor_rules(invoice_id, db)
+                logger.info(f"Invoice {invoice_id} re-parsed with vendor rules: {result.get('message', 'No message')}")
+                return
+
         result = parser.parse_and_save(invoice_id, db)
         logger.info(f"Invoice {invoice_id} parsed successfully in background: {result.get('message', 'No message')}")
     except ValueError as e:

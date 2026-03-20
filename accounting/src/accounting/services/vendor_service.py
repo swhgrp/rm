@@ -112,6 +112,18 @@ class VendorService:
         if not create_if_not_found:
             return None, False, False
 
+        # Before creating, check if vendor exists but is inactive
+        # (resolve_vendor_name only checks active vendors)
+        inactive_vendor = self.db.query(Vendor).filter(
+            func.lower(Vendor.vendor_name) == func.lower(vendor_name.strip())
+        ).first()
+
+        if inactive_vendor:
+            # Reactivate existing vendor instead of creating duplicate
+            inactive_vendor.is_active = True
+            self.db.flush()
+            return inactive_vendor, False, False
+
         # Create new vendor
         new_vendor = Vendor(
             vendor_name=vendor_name.strip(),

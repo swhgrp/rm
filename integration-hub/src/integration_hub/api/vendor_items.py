@@ -1635,7 +1635,7 @@ async def delete_vendor_item(
         if price_count > 0:
             raise HTTPException(
                 status_code=400,
-                detail=f"Cannot permanently delete: item has {price_count} location price record(s) from invoices. Use deactivate instead."
+                detail=f"Cannot delete: this item appears on {price_count} invoice line(s). Deactivate it instead, or use 'Map to Expense' to convert it to an expense item."
             )
 
         # Also sync deletion to Inventory first

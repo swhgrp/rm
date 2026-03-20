@@ -32,25 +32,27 @@ class CSVInvoiceParser:
     def __init__(self, db: Session):
         self.db = db
         self._location_cache: Dict[str, Tuple[int, str]] = {}
+        self._name_cache: Dict[str, Tuple[int, str]] = {}
         self._load_location_mappings()
 
     def _load_location_mappings(self):
         """Load location code -> (id, name) mappings from inventory database"""
         try:
-            # Query inventory database for location codes
-            result = self.db.execute(sql_text("""
-                SELECT id, code, name
-                FROM inventory_db.locations
-                WHERE is_active = true AND code IS NOT NULL
-            """))
-            for row in result:
-                self._location_cache[str(row.code)] = (row.id, row.name)
+            from integration_hub.db.database import get_inventory_engine
+            engine = get_inventory_engine()
+            with engine.connect() as conn:
+                result = conn.execute(sql_text(
+                    "SELECT id, code, name FROM locations WHERE is_active = true"
+                ))
+                for row in result:
+                    if row[1]:  # code
+                        self._location_cache[str(row[1])] = (row[0], row[2])
+                    # Also index by lowercase name for fuzzy fallback
+                    if row[2]:
+                        self._name_cache[row[2].lower().strip()] = (row[0], row[2])
             logger.info(f"Loaded {len(self._location_cache)} location mappings")
         except Exception as e:
-            # Cross-database query failed - rollback to clear aborted transaction state
-            self.db.rollback()
-            logger.warning(f"Could not load locations from inventory_db: {e}")
-            # Fallback: hardcode known mappings (should be updated to use proper DB connection)
+            logger.warning(f"Could not load locations from inventory DB: {e}")
             self._location_cache = {
                 '400': (1, 'Seaside Grill'),
                 '300': (2, 'The Nest Eatery'),
@@ -58,20 +60,45 @@ class CSVInvoiceParser:
                 '200': (4, 'Okee Grill'),
                 '700': (5, 'Park Bistro'),
                 '600': (6, 'Links Grill'),
-                '800': (7, "Tina's Treats"),
             }
+            self._name_cache = {v[1].lower(): v for v in self._location_cache.values()}
 
-    def get_location_by_store_number(self, store_number: str) -> Optional[Tuple[int, str]]:
+    def get_location_by_store_number(self, store_number: str, location_name: str = None) -> Optional[Tuple[int, str]]:
         """
-        Get location ID and name from store number.
+        Get location ID and name from store number, with name fallback.
 
         Args:
-            store_number: Retailer Store Number from CSV (e.g., "500")
+            store_number: Store code from CSV (e.g., "500")
+            location_name: Location name from CSV for fuzzy fallback
 
         Returns:
             Tuple of (location_id, location_name) or None if not found
         """
-        return self._location_cache.get(str(store_number).strip())
+        store_number = str(store_number).strip()
+        if store_number:
+            result = self._location_cache.get(store_number)
+            if result:
+                return result
+
+        # Fallback: match by location name (handles GFS store invoices with no store code)
+        if location_name:
+            name_lower = location_name.lower().strip()
+            # Exact name match
+            if name_lower in self._name_cache:
+                return self._name_cache[name_lower]
+            # Substring: check if any known name is contained in the CSV name or vice versa
+            for known_name, loc_info in self._name_cache.items():
+                if known_name in name_lower or name_lower in known_name:
+                    return loc_info
+            # Fuzzy: match first word (e.g., "Parks Binstro" -> "Park Bistro")
+            first_word = name_lower.split()[0] if name_lower.split() else ''
+            if len(first_word) >= 3:
+                for known_name, loc_info in self._name_cache.items():
+                    known_first = known_name.split()[0] if known_name.split() else ''
+                    if first_word[:3] == known_first[:3]:
+                        return loc_info
+
+        return None
 
     def parse_csv_file(self, file_path: str) -> Dict:
         """
@@ -123,9 +150,98 @@ class CSVInvoiceParser:
                 'invoices': []
             }
 
+    def _detect_csv_format(self, fieldnames: List[str]) -> str:
+        """
+        Detect CSV format from column headers.
+
+        Returns:
+            'gfs' for Gordon Food Service CSV
+            'fintech' for fintech beer/alcohol CSV
+            'statement' for summary/statement CSV
+            'unknown' if unrecognized
+        """
+        field_set = set(fieldnames)
+
+        # Statement/summary CSVs (camelCase columns, no line items)
+        statement_columns = {'VendorName', 'InvoiceNumber', 'InvoiceAmount'}
+        if statement_columns.issubset(field_set) and 'Product Number' not in field_set:
+            return 'statement'
+
+        # GFS CSV: has "Source Warehouse", "Item Number", "Item Description"
+        if 'Source Warehouse' in field_set and 'Item Number' in field_set:
+            return 'gfs'
+
+        # Fintech beer CSV: has "Product Number", "Vendor Name", "Retailer Store Number"
+        if 'Product Number' in field_set or 'Retailer Store Number' in field_set:
+            return 'fintech'
+
+        return 'unknown'
+
+    def _normalize_gfs_row(self, row: Dict) -> Dict:
+        """
+        Map GFS CSV columns to the standard fintech column names so
+        the rest of the parsing pipeline works unchanged.
+        """
+        # Quantity: use Quantity Shipped; for catch-weight items use CW Weight as qty
+        qty_shipped = row.get('Quantity Shipped', '0') or '0'
+        is_catch_weight = (row.get('Catch Weight', '') or '').upper() == 'Y'
+        cw_weight = row.get('CW Weight', '0') or '0'
+
+        if is_catch_weight and cw_weight and float(cw_weight) > 0:
+            quantity = cw_weight
+        else:
+            quantity = qty_shipped
+
+        # Case Price is per-case price; Extended Price is line total
+        case_price = row.get('Case Price', '0') or '0'
+        extended_price = row.get('Extended Price', '0') or '0'
+
+        # Calculate unit price: extended / qty to get actual price paid per unit
+        try:
+            qty_val = Decimal(quantity)
+            ext_val = Decimal(extended_price)
+            unit_price = str(ext_val / qty_val) if qty_val else case_price
+        except Exception:
+            unit_price = case_price
+
+        return {
+            'Invoice Number': row.get('Invoice Number', ''),
+            'Invoice Date': row.get('Invoice Date', ''),
+            'Invoice DueDate': '',
+            'Retailer Store Number': row.get('Store Location', ''),
+            'Vendor Name': 'Gordon Food Service',
+            'Retailer Name': row.get('Location Name', ''),
+            'Product Number': row.get('Item Number', ''),
+            'Product Description': row.get('Item Description', ''),
+            'Quantity': quantity,
+            'Invoice Line Item Cost': unit_price,
+            'Extended Price': extended_price,
+            'Unit Of Measure': row.get('Case Size', '') or 'CA',
+            'Packs Per Case': row.get('Package Size', ''),
+            '_gfs_content_uom': row.get('UOM', ''),
+            'Units Per Pack': '',
+            'Case UPC': row.get('UPC', ''),
+            'Clean UPC': '',
+            'Product Class': row.get('Category Description', ''),
+            'GL Code': row.get('GL Code', ''),
+            'Product Volume': '',
+            # Preserve GFS-specific fields for reference
+            '_gfs_supplier': row.get('Supplier', ''),
+            '_gfs_brand': row.get('Brand', ''),
+            '_gfs_sub_category': row.get('Sub Category Description', ''),
+            '_gfs_catch_weight': is_catch_weight,
+            '_gfs_cw_weight': cw_weight,
+            '_gfs_case_price': case_price,
+            '_gfs_qty_ordered': row.get('Quantity Ordered', ''),
+        }
+
     def parse_csv_content(self, content: str) -> Dict:
         """
         Parse CSV content string and group by invoice number.
+
+        Supports multiple CSV formats:
+        - Fintech beer/alcohol CSVs (from ftx_admin@fintech.com)
+        - Gordon Food Service delivery CSVs
 
         Args:
             content: CSV file content as string
@@ -137,12 +253,10 @@ class CSVInvoiceParser:
             reader = csv.DictReader(StringIO(content))
             fieldnames = reader.fieldnames or []
 
-            # Detect statement/summary CSVs (no line-item detail)
-            # Statement CSVs use camelCase columns like "VendorName", "InvoiceNumber"
-            # Detail CSVs use spaced columns like "Invoice Number", "Product Number"
-            statement_columns = {'VendorName', 'InvoiceNumber', 'InvoiceAmount'}
-            if statement_columns.issubset(set(fieldnames)) and 'Product Number' not in fieldnames:
-                logger.info(f"CSV detected as statement/summary (columns: {fieldnames[:5]}...)")
+            csv_format = self._detect_csv_format(fieldnames)
+            logger.info(f"Detected CSV format: {csv_format} (columns: {fieldnames[:6]}...)")
+
+            if csv_format == 'statement':
                 return {
                     'success': True,
                     'message': 'CSV is a statement/summary file (no line-item detail)',
@@ -154,6 +268,10 @@ class CSVInvoiceParser:
             invoice_groups: Dict[str, Dict] = {}
 
             for row in reader:
+                # Normalize GFS rows to standard column names
+                if csv_format == 'gfs':
+                    row = self._normalize_gfs_row(row)
+
                 invoice_num = row.get('Invoice Number', '').strip()
                 store_num = row.get('Retailer Store Number', '').strip()
 
@@ -168,8 +286,9 @@ class CSVInvoiceParser:
                     invoice_date = self._parse_date(row.get('Invoice Date', ''))
                     due_date = self._parse_date(row.get('Invoice DueDate', ''))
 
-                    # Get location mapping
-                    location_info = self.get_location_by_store_number(store_num)
+                    # Get location mapping (with name fallback for GFS store invoices)
+                    retailer_name = row.get('Retailer Name', '').strip()
+                    location_info = self.get_location_by_store_number(store_num, retailer_name)
                     location_id = location_info[0] if location_info else None
                     location_name = location_info[1] if location_info else None
 
@@ -183,20 +302,37 @@ class CSVInvoiceParser:
                         'location_name': location_name,
                         'store_number': store_num,
                         'retailer_name': row.get('Retailer Name', '').strip(),
+                        'csv_format': csv_format,
                         'items': []
                     }
 
                 # Parse line item
                 item = self._parse_line_item(row)
                 if item:
+                    # Deduplicate — GFS CSVs sometimes contain exact duplicate rows
+                    dedup_key = (
+                        item['product_number'],
+                        str(item['quantity']),
+                        str(item['unit_price']),
+                        str(item['total']),
+                    )
+                    seen_items = invoice_groups[group_key].setdefault('_seen', set())
+                    if dedup_key in seen_items:
+                        logger.debug(f"Skipping duplicate CSV row: {item['product_number']} "
+                                    f"qty={item['quantity']} price={item['unit_price']}")
+                        continue
+                    seen_items.add(dedup_key)
                     invoice_groups[group_key]['items'].append(item)
                     invoice_groups[group_key]['total_amount'] += item['total']
 
             invoices = list(invoice_groups.values())
+            # Clean up internal tracking sets
+            for inv in invoices:
+                inv.pop('_seen', None)
 
             return {
                 'success': True,
-                'message': f"Parsed {len(invoices)} invoice(s) with {sum(len(inv['items']) for inv in invoices)} line items",
+                'message': f"Parsed {len(invoices)} invoice(s) with {sum(len(inv['items']) for inv in invoices)} line items ({csv_format} format)",
                 'invoices': invoices
             }
 
@@ -317,26 +453,80 @@ class CSVInvoiceParser:
             created_invoices = []
 
             # If single invoice in CSV, update the existing hub_invoice
-            # If multiple invoices, create new records for additional ones
+            # If multiple invoices, find existing or create new records
             for i, inv_data in enumerate(result['invoices']):
                 if i == 0:
-                    # Update the original hub_invoice
-                    invoice = hub_invoice
+                    # Check if a PDF-parsed invoice already exists for this invoice number
+                    # If so, update that one and mark the CSV record as duplicate
+                    inv_num_stripped = inv_data['invoice_number'].lstrip('0') or '0'
+                    pdf_sibling = None
+                    if inv_data.get('location_id'):
+                        for ps in self.db.query(HubInvoice).filter(
+                            HubInvoice.id != hub_invoice.id,
+                            HubInvoice.location_id == inv_data['location_id'],
+                            HubInvoice.source_filename.ilike('%.pdf'),
+                            HubInvoice.status.notin_(['sent', 'duplicate']),
+                        ).all():
+                            ps_num = (ps.invoice_number or '').lstrip('0') or '0'
+                            if ps_num == inv_num_stripped:
+                                pdf_sibling = ps
+                                break
+                    if pdf_sibling:
+                        # Replace PDF-parsed invoice with CSV data, mark CSV record as duplicate
+                        invoice = pdf_sibling
+                        hub_invoice.status = 'duplicate'
+                        logger.info(f"CSV invoice {hub_invoice.id}: found PDF sibling {pdf_sibling.id} "
+                                   f"(#{pdf_sibling.invoice_number}) — replacing PDF data with CSV")
+                    else:
+                        # Update the original hub_invoice
+                        invoice = hub_invoice
                 else:
-                    # Create new HubInvoice for additional invoices in the CSV
-                    invoice = HubInvoice(
-                        source='email',
-                        source_filename=hub_invoice.source_filename,
-                        pdf_path=hub_invoice.pdf_path,
-                        email_subject=hub_invoice.email_subject,
-                        email_from=hub_invoice.email_from,
-                        email_received_at=hub_invoice.email_received_at,
-                        # Generate unique hash for child invoice (must fit varchar(64))
-                        invoice_hash=hashlib.sha256(
-                            f"{hub_invoice.invoice_hash}_{inv_data['invoice_number']}_{inv_data['store_number']}".encode()
-                        ).hexdigest()
-                    )
-                    self.db.add(invoice)
+                    # Check if invoice with same number + location already exists
+                    existing = self.db.query(HubInvoice).filter(
+                        HubInvoice.invoice_number == inv_data['invoice_number'],
+                        HubInvoice.location_id == inv_data['location_id'],
+                        HubInvoice.id != hub_invoice.id
+                    ).first()
+
+                    if existing:
+                        # Update existing invoice instead of creating duplicate
+                        invoice = existing
+                        logger.info(f"Found existing invoice {existing.id} for "
+                                   f"{inv_data['invoice_number']} at location {inv_data['location_id']}")
+                    else:
+                        # Also check for PDF-parsed invoice with same number (without leading zeros)
+                        inv_num_stripped = inv_data['invoice_number'].lstrip('0') or '0'
+                        pdf_sibling = self.db.query(HubInvoice).filter(
+                            HubInvoice.id != hub_invoice.id,
+                            HubInvoice.location_id == inv_data['location_id'],
+                            HubInvoice.source_filename.ilike('%.pdf'),
+                        ).all()
+                        pdf_match = None
+                        for ps in pdf_sibling:
+                            ps_num = (ps.invoice_number or '').lstrip('0') or '0'
+                            if ps_num == inv_num_stripped:
+                                pdf_match = ps
+                                break
+                        if pdf_match:
+                            # Replace PDF-parsed invoice with CSV data
+                            invoice = pdf_match
+                            logger.info(f"Found PDF-parsed sibling {pdf_match.id} (#{pdf_match.invoice_number}) "
+                                       f"for CSV invoice {inv_data['invoice_number']} — replacing with CSV data")
+                        else:
+                            # Create new HubInvoice for additional invoices in the CSV
+                            invoice = HubInvoice(
+                                source='email',
+                                source_filename=hub_invoice.source_filename,
+                                pdf_path=hub_invoice.pdf_path,
+                                email_subject=hub_invoice.email_subject,
+                                email_from=hub_invoice.email_from,
+                                email_received_at=hub_invoice.email_received_at,
+                                # Generate unique hash for child invoice (must fit varchar(64))
+                                invoice_hash=hashlib.sha256(
+                                    f"{hub_invoice.invoice_hash}_{inv_data['invoice_number']}_{inv_data['store_number']}".encode()
+                                ).hexdigest()
+                            )
+                            self.db.add(invoice)
 
                 # Update invoice fields
                 invoice.vendor_name = inv_data['vendor_name']
@@ -349,6 +539,18 @@ class CSVInvoiceParser:
                 invoice.status = 'mapping'  # Ready for item mapping
                 invoice.parse_error = None
 
+                # Match vendor name to existing vendor record
+                if not invoice.vendor_id and inv_data['vendor_name']:
+                    try:
+                        from integration_hub.services.invoice_parser import InvoiceParser
+                        parser = InvoiceParser()
+                        vendor = parser.match_vendor(inv_data['vendor_name'], self.db)
+                        if vendor:
+                            invoice.vendor_id = vendor.id
+                            logger.info(f"Matched CSV vendor '{inv_data['vendor_name']}' to vendor {vendor.id} ({vendor.name})")
+                    except Exception as e:
+                        logger.warning(f"Vendor matching failed for '{inv_data['vendor_name']}': {e}")
+
                 # Store raw data for reference
                 invoice.raw_data = {
                     'source': 'fintech_csv',
@@ -359,11 +561,10 @@ class CSVInvoiceParser:
 
                 self.db.flush()  # Get invoice ID for items
 
-                # Clear existing items if updating
-                if i == 0:
-                    self.db.query(HubInvoiceItem).filter(
-                        HubInvoiceItem.invoice_id == invoice.id
-                    ).delete()
+                # Clear existing items when updating (re-parse)
+                self.db.query(HubInvoiceItem).filter(
+                    HubInvoiceItem.invoice_id == invoice.id
+                ).delete()
 
                 # Create line items
                 for line_num, item in enumerate(inv_data['items'], 1):

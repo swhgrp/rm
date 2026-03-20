@@ -644,12 +644,12 @@
                 <p>Map "<strong id="convertExpenseItemName"></strong>" to an expense account:</p>
 
                 <div class="mb-3">
-                    <label class="form-label">Expense/COGS Account <span class="text-danger">*</span></label>
+                    <label class="form-label">GL Account <span class="text-danger">*</span></label>
                     <div class="searchable-select-wrapper">
                         <input type="text" class="form-control search-input mb-1" id="searchExpenseAccount" placeholder="Search accounts...">
                         <select class="form-select" id="expenseAccountSelect" size="8" required>
                             {% for account in gl_accounts %}
-                            {% if account.account_type == 'EXPENSE' or account.account_type == 'COGS' %}
+                            {% if account.account_type in ['EXPENSE', 'COGS', 'ASSET'] %}
                             <option value="{{ account.account_number }}">{{ account.account_number }} - {{ account.account_name }}</option>
                             {% endif %}
                             {% endfor %}
@@ -1589,7 +1589,26 @@ async function deleteItem() {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.detail || 'Failed to delete vendor item');
+            const detail = error.detail || 'Failed to delete vendor item';
+            // If blocked by invoice references, offer deactivation
+            if (response.status === 400 && detail.includes('invoice')) {
+                const deactivate = await showConfirm(
+                    detail + '\n\nWould you like to deactivate it instead?',
+                    'Cannot Delete'
+                );
+                if (deactivate) {
+                    const deactResp = await fetch(`/hub/api/v1/vendor-items/${itemId}`, {
+                        method: 'DELETE'
+                    });
+                    if (deactResp.ok) {
+                        showToast('Vendor item deactivated', 'Success', 'success');
+                        setTimeout(() => { window.location.href = 'vendor-items'; }, 500);
+                        return;
+                    }
+                }
+                return;
+            }
+            throw new Error(detail);
         }
 
         showToast('Vendor item deleted successfully', 'Success', 'success');

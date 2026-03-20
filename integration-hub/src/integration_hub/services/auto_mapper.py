@@ -880,21 +880,23 @@ class AutoMapperService:
             'reason': None if has_required_gl else 'no_category_gl_mapping'
         }
 
-    def map_item(self, item: HubInvoiceItem, vendor_id: int = None, location_id: int = None) -> Dict:
+    def map_item(self, item: HubInvoiceItem, vendor_id: int = None, location_id: int = None, csv_source: bool = False) -> Dict:
         """
         Attempt to automatically map a single item
 
         Matching strategy (in order of priority):
         0. Vendor expense rule - entire vendor is an expense vendor (all items → same GL)
         1. SKU match - exact match against vendor_items.vendor_sku
+        1b. Near-SKU match - (PDF/AI-parsed only, skipped for CSV)
         2. Learned mapping - user-approved mappings from previous manual mappings
-        3. Fuzzy description match - vendor-scoped fuzzy name matching (0.8+ threshold)
+        3. Fuzzy description match - (PDF/AI-parsed only, skipped for CSV)
         4. Expense mapping - expense items from invoice_item_mapping_deprecated
 
         Args:
             item: The invoice item to map
             vendor_id: Hub vendor ID for the invoice (for vendor-scoped matching)
             location_id: Location ID from invoice (for location-specific matching)
+            csv_source: If True, skip fuzzy/near-SKU matching (CSV has exact codes)
 
         Returns:
             Dict with mapping result including location info
@@ -933,7 +935,8 @@ class AutoMapperService:
                 return result
 
         # 1b. Try near-SKU match (1-2 digits off, confirmed by description similarity)
-        if item.item_code:
+        # Skip for CSV-parsed invoices — CSV has exact machine-generated SKUs
+        if item.item_code and not csv_source:
             vendor_item = self.match_by_near_sku(
                 item.item_code, vendor_id, location_id,
                 item_description=item.item_description
@@ -954,7 +957,8 @@ class AutoMapperService:
                 return result
 
         # 3. Try fuzzy description match against vendor items (vendor-scoped, high threshold)
-        if vendor_id and item.item_description:
+        # Skip for CSV-parsed invoices — CSV has exact SKUs, fuzzy matching risks wrong products
+        if vendor_id and item.item_description and not csv_source:
             fuzzy_result = self.match_by_fuzzy_name(
                 item.item_description, vendor_id, location_id,
                 min_similarity=0.8
@@ -1012,10 +1016,13 @@ class AutoMapperService:
                 item.inventory_item_id = mapping_result.get('vendor_item_id')
                 item.mapping_method = mapping_result.get('method')
                 # Overwrite parsed code/description with canonical vendor item values
-                if mapping_result.get('vendor_sku'):
-                    item.item_code = mapping_result['vendor_sku']
-                if mapping_result.get('vendor_item_name'):
-                    item.item_description = mapping_result['vendor_item_name']
+                # Only for exact matches — near_sku_match should preserve original
+                # parsed values so discrepancies are visible for review
+                if mapping_result.get('method') != 'near_sku_match':
+                    if mapping_result.get('vendor_sku'):
+                        item.item_code = mapping_result['vendor_sku']
+                    if mapping_result.get('vendor_item_name'):
+                        item.item_description = mapping_result['vendor_item_name']
 
             # Store master item info if available
             if mapping_result.get('inventory_vendor_item_id'):
@@ -1115,7 +1122,14 @@ class AutoMapperService:
         vendor_id = invoice.vendor_id
         location_id = invoice.location_id
 
-        logger.info(f"Auto-mapping invoice {invoice_id}: vendor={vendor_id}, location={location_id}")
+        # Detect CSV source — CSV has exact machine-generated SKUs, skip fuzzy matching
+        csv_source = bool(
+            invoice.source_filename and invoice.source_filename.lower().endswith('.csv')
+        ) or bool(
+            invoice.pdf_path and invoice.pdf_path.lower().endswith('.csv')
+        )
+
+        logger.info(f"Auto-mapping invoice {invoice_id}: vendor={vendor_id}, location={location_id}, csv={csv_source}")
 
         # Get all unmapped items
         items = self.db.query(HubInvoiceItem).filter(
@@ -1134,7 +1148,7 @@ class AutoMapperService:
 
         for item in items:
             # Pass vendor_id AND location_id for location-aware matching
-            mapping_result = self.map_item(item, vendor_id=vendor_id, location_id=location_id)
+            mapping_result = self.map_item(item, vendor_id=vendor_id, location_id=location_id, csv_source=csv_source)
 
             if self.apply_mapping(item, mapping_result):
                 stats['mapped_count'] += 1

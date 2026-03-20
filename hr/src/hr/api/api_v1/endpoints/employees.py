@@ -131,7 +131,7 @@ def create_employee(
 @router.get("/", response_model=List[Employee])
 def list_employees(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 1000,
     status: str = None,
     location_id: Optional[int] = None,
     db: Session = Depends(get_db),

@@ -998,7 +998,12 @@
         function showNotification(message, title = 'Accounting System') {
             document.getElementById('notificationTitle').textContent = title;
             document.getElementById('notificationMessage').textContent = message;
-            const modal = new bootstrap.Modal(document.getElementById('notificationModal'));
+            // Clean up any stale backdrops before showing
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('notificationModal'));
             modal.show();
         }
 

@@ -193,7 +193,7 @@ class EmailMonitorService:
         """
         marked_count = 0
         # Statuses safe to remove as duplicate (not yet sent/processed)
-        markable_statuses = ('pending', 'pending_csv', 'mapping', 'ready', 'parse_failed')
+        markable_statuses = ('pending', 'pending_csv', 'mapping', 'ready', 'parse_failed', 'pdf_reference')
 
         for inv_id in invoice_ids:
             try:

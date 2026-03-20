@@ -187,6 +187,8 @@
                                 <span class="badge bg-info">Statement</span>
                                 {% elif invoice.status == 'sent' %}
                                 <span class="badge badge-sent">Sent</span>
+                                {% elif invoice.status == 'pdf_reference' %}
+                                <span class="badge bg-info">PDF Reference</span>
                                 {% elif invoice.status == 'duplicate' %}
                                 <span class="badge bg-dark">Duplicate</span>
                                 {% elif invoice.status == 'needs_review' %}
@@ -358,7 +360,7 @@ function updateTabCounts() {
             counts.ready++;
         } else if (status === 'sent') {
             counts.sent++;
-        } else if (status === 'statement') {
+        } else if (status === 'statement' || status === 'pdf_reference') {
             counts.statements++;
         }
 
@@ -409,7 +411,7 @@ function filterTable() {
         } else if (currentTabFilter === 'sent') {
             matchesTab = (status === 'sent');
         } else if (currentTabFilter === 'statements') {
-            matchesTab = (status === 'statement');
+            matchesTab = (status === 'statement' || status === 'pdf_reference');
         } else if (currentTabFilter === 'errors') {
             matchesTab = hasErrors;
         } else if (currentTabFilter === 'duplicates') {
@@ -514,7 +516,7 @@ function changePage(direction) {
         } else if (currentTabFilter === 'sent') {
             matchesTab = (status === 'sent');
         } else if (currentTabFilter === 'statements') {
-            matchesTab = (status === 'statement');
+            matchesTab = (status === 'statement' || status === 'pdf_reference');
         } else if (currentTabFilter === 'errors') {
             matchesTab = hasErrors;
         } else if (currentTabFilter === 'duplicates') {
@@ -587,11 +589,13 @@ if (searchInput) {
     updateTabCounts();
     filterTable();
 
-    // Save filter state on change
+    // Save filter state on change (debounced for fluid typing)
+    let searchDebounceTimer = null;
     searchInput.addEventListener('input', () => {
         sessionStorage.setItem('invoiceSearch', searchInput.value);
-        currentPage = 1; // Reset to page 1 when searching
-        filterTable();
+        currentPage = 1;
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => filterTable(), 300);
     });
     sourceFilter.addEventListener('change', () => {
         sessionStorage.setItem('invoiceSourceFilter', sourceFilter.value);
