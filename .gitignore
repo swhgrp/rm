@@ -87,3 +87,12 @@ cookies.txt
 
 # HR document uploads (employee documents)
 hr/documents/
+
+# File storage (user uploads)
+files/storage/
+
+# Docker compose backups
+*.yml.bak
+
+# Claude Code local settings
+.claude/settings.local.json
