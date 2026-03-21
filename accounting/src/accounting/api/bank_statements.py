@@ -519,16 +519,23 @@ def recognize_vendor_from_transaction(
     has_exact_match = False
 
     if vendor:
-        # Count unpaid/partial bills matching vendor name
+        # Count unpaid/partial bills matching vendor name, filtered by bank account's location
         # Note: vendor_bills.vendor_id is VARCHAR, not FK to vendors.id
         # It stores vendor_code or vendor_name
-        open_bills = db.query(VendorBill).filter(
+        bank_account = db.query(BankAccount).filter(BankAccount.id == transaction.bank_account_id).first()
+
+        open_bills_query = db.query(VendorBill).filter(
             (VendorBill.vendor_name == vendor.vendor_name) |
             (VendorBill.vendor_id == vendor.vendor_code) |
             (VendorBill.vendor_name == vendor.vendor_code) |  # Bill uses code as name
             (VendorBill.vendor_id == vendor.vendor_name),     # Bill uses name as ID
             VendorBill.status.in_(['DRAFT', 'APPROVED', 'PARTIALLY_PAID'])
-        ).all()
+        )
+
+        if bank_account and bank_account.area_id:
+            open_bills_query = open_bills_query.filter(VendorBill.area_id == bank_account.area_id)
+
+        open_bills = open_bills_query.all()
 
         open_bills_count = len(open_bills)
 
@@ -616,10 +623,13 @@ def get_open_bills_for_transaction(
             exact_matches=0
         )
 
-    # Get open bills for vendor
+    # Get open bills for vendor, filtered to the bank account's location
     from datetime import timedelta
     date_min = transaction.transaction_date - timedelta(days=date_window_days)
     date_max = transaction.transaction_date + timedelta(days=date_window_days)
+
+    # Get the bank account's area_id to filter bills by location
+    bank_account = db.query(BankAccount).filter(BankAccount.id == transaction.bank_account_id).first()
 
     open_bills_query = db.query(VendorBill).filter(
         (VendorBill.vendor_name == vendor.vendor_name) |
@@ -629,7 +639,13 @@ def get_open_bills_for_transaction(
         VendorBill.status.in_(['DRAFT', 'APPROVED', 'PARTIALLY_PAID']),
         VendorBill.bill_date >= date_min,
         VendorBill.bill_date <= date_max
-    ).order_by(VendorBill.bill_date.desc())
+    )
+
+    # Only show bills for this bank account's location
+    if bank_account and bank_account.area_id:
+        open_bills_query = open_bills_query.filter(VendorBill.area_id == bank_account.area_id)
+
+    open_bills_query = open_bills_query.order_by(VendorBill.bill_date.desc())
 
     open_bills = open_bills_query.all()
 

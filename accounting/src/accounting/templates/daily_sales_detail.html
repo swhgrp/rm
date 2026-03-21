@@ -329,10 +329,11 @@
                         <table class="table table-sm">
                             <thead>
                                 <tr>
-                                    <th style="width: 20%;">Time</th>
-                                    <th style="width: 20%;">Employee</th>
-                                    <th style="width: 40%;">Note/Reason</th>
-                                    <th style="width: 20%; text-align: right;">Amount</th>
+                                    <th style="width: 15%;">Time</th>
+                                    <th style="width: 15%;">Employee</th>
+                                    <th style="width: 25%;">Note/Reason</th>
+                                    <th style="width: 30%;">GL Account</th>
+                                    <th style="width: 15%; text-align: right;">Amount</th>
                                 </tr>
                             </thead>
                             <tbody id="payoutLines">
@@ -340,7 +341,7 @@
                             </tbody>
                             <tfoot>
                                 <tr style="font-weight: bold; background-color: #f8f9fa;">
-                                    <td colspan="3" style="text-align: right;">TOTAL PAYOUTS:</td>
+                                    <td colspan="4" style="text-align: right;">TOTAL PAYOUTS:</td>
                                     <td style="text-align: right;" id="payoutTotal">$0.00</td>
                                 </tr>
                             </tfoot>
@@ -500,7 +501,10 @@ async function loadDSS(id) {
         // Load POS mappings if this is a POS-imported entry
         let paymentMappings = {};
         let discountMappings = {};
+        let discountOverrideMappings = {};
+        let discountFallbackMappings = {};
         let categoryMappings = {};
+        let categoryDiscountMappings = {};
         if (dss.imported_from_pos && dss.area_id) {
             try {
                 // Fetch payment mappings
@@ -520,13 +524,27 @@ async function loadDSS(id) {
                     categoryMappings = Object.fromEntries(
                         mappings.filter(m => m.is_active).map(m => [m.pos_category, m.revenue_account_id])
                     );
+                    // Also build category → discount account map
+                    categoryDiscountMappings = Object.fromEntries(
+                        mappings.filter(m => m.is_active && m.discount_account_id).map(m => [m.pos_category, m.discount_account_id])
+                    );
                     debug.log('Loaded category mappings:', categoryMappings);
+                    debug.log('Loaded category discount mappings:', categoryDiscountMappings);
                 }
 
-                // Fetch discount mappings
+                // Fetch discount mappings - split into override and fallback
                 const discountResp = await fetch(`/accounting/api/pos/discount-mappings?area_id=${dss.area_id}`);
                 if (discountResp.ok) {
                     const mappings = await discountResp.json();
+                    // Override mappings: always use this account regardless of category
+                    discountOverrideMappings = Object.fromEntries(
+                        mappings.filter(m => m.is_active && m.is_override).map(m => [m.pos_discount_name, m.discount_account_id])
+                    );
+                    // Fallback mappings: only used when no category routing exists
+                    discountFallbackMappings = Object.fromEntries(
+                        mappings.filter(m => m.is_active && !m.is_override).map(m => [m.pos_discount_name, m.discount_account_id])
+                    );
+                    // Keep combined for backward compat
                     discountMappings = Object.fromEntries(
                         mappings.filter(m => m.is_active).map(m => [m.pos_discount_name, m.discount_account_id])
                     );
@@ -633,21 +651,43 @@ async function loadDSS(id) {
         renderPaymentLines();
 
         // Load discounts - convert from discount_breakdown if present
+        // Keys may be "Category|DiscountName" (new) or plain "DiscountName" (legacy)
         debug.log('DSS discount_breakdown:', dss.discount_breakdown);
         if (dss.discount_breakdown) {
             discountLines = [];
-            for (const [discountName, amount] of Object.entries(dss.discount_breakdown)) {
-                const discountAmount = Math.abs(parseFloat(amount)); // Convert negative to positive
-                debug.log(`Processing discount: ${discountName} = ${amount} -> ${discountAmount}`);
+            for (const [discountKey, amount] of Object.entries(dss.discount_breakdown)) {
+                const rawAmount = parseFloat(amount);
+                const discountAmount = Math.abs(rawAmount);
+                const storedAmount = discountAmount;
+                debug.log(`Processing discount: ${discountKey} = ${amount} -> stored: ${storedAmount}`);
                 // Only add non-zero discounts
                 if (discountAmount > 0) {
-                    // Look up mapped account for this discount
-                    const mappedAccountId = discountMappings[discountName] || null;
+                    // Parse category prefix if present
+                    let discountName = discountKey;
+                    let discountCategory = null;
+                    if (discountKey.includes('|')) {
+                        const parts = discountKey.split('|', 2);
+                        discountCategory = parts[0];
+                        discountName = parts[1];
+                    }
+
+                    // Look up mapped account using 3-tier routing:
+                    // 1. Override discount mapping (e.g., Staff Meal→4102, Waste→4818, Rounding→7250)
+                    // 2. Category discount account (e.g., NAB→4131, Beer→4153, Wine→4156)
+                    // 3. Fallback discount name mapping (legacy, only when no category routing)
+                    let mappedAccountId = discountOverrideMappings[discountName] || null;
+                    if (!mappedAccountId && discountCategory && categoryDiscountMappings[discountCategory]) {
+                        mappedAccountId = categoryDiscountMappings[discountCategory];
+                    }
+                    if (!mappedAccountId) {
+                        mappedAccountId = discountFallbackMappings[discountName] || null;
+                    }
 
                     discountLines.push({
-                        discount_name: discountName,
+                        discount_name: discountKey,  // Keep full key for save/post
+                        discount_display: discountCategory ? `${discountName} (${discountCategory})` : discountName,
                         discount_account_id: mappedAccountId,
-                        amount: discountAmount
+                        amount: storedAmount
                     });
                 }
             }
@@ -664,7 +704,8 @@ async function loadDSS(id) {
                 timestamp: p.timestamp,
                 employee: p.employee || 'Unknown',
                 note: p.note || 'Cash payout',
-                amount: parseFloat(p.amount) || 0
+                amount: parseFloat(p.amount) || 0,
+                gl_account_id: p.gl_account_id || null
             }));
         } else {
             payoutLines = [];
@@ -1045,9 +1086,9 @@ function renderDiscountLines(preserveStoredDiscounts = false) {
         tr.innerHTML = `
             <td>
                 <input type="text" class="form-control form-control-sm"
-                       value="${line.discount_name || ''}"
+                       value="${line.discount_display || line.discount_name || ''}"
                        onchange="updateDiscountLine(${index}, 'discount_name', this.value)"
-                       placeholder="Discount name...">
+                       placeholder="Discount name..." title="${line.discount_name || ''}">
             </td>
             <td>
                 <select class="form-select form-select-sm"
@@ -1138,7 +1179,7 @@ function renderPayoutLines() {
     if (payoutLines.length === 0) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td colspan="4" class="text-center text-muted">
+            <td colspan="5" class="text-center text-muted">
                 No payouts recorded for this day
             </td>
         `;
@@ -1157,10 +1198,25 @@ function renderPayoutLines() {
                 });
             }
 
+            // Build GL account dropdown - show expense accounts (5xxx-9xxx)
+            const expenseAccounts = accounts.filter(a => {
+                const num = parseInt(a.account_number);
+                return num >= 5000 || (num >= 1000 && num < 2000);  // Expense accounts + asset accounts
+            });
+            const glOptions = expenseAccounts.map(acc =>
+                `<option value="${acc.id}" ${acc.id === line.gl_account_id ? 'selected' : ''}>${acc.account_number} - ${acc.account_name}</option>`
+            ).join('');
+
             tr.innerHTML = `
                 <td>${timeDisplay}</td>
                 <td>${line.employee || 'Unknown'}</td>
                 <td>${line.note || 'Cash payout'}</td>
+                <td>
+                    <select class="form-select form-select-sm" onchange="updatePayoutGL(${index}, parseInt(this.value))">
+                        <option value="">Select Account...</option>
+                        ${glOptions}
+                    </select>
+                </td>
                 <td class="text-end">${formatCurrency(line.amount)}</td>
             `;
             tbody.appendChild(tr);
@@ -1178,6 +1234,11 @@ function calculatePayoutTotals() {
     });
 
     document.getElementById('payoutTotal').textContent = formatCurrency(totalPayouts);
+}
+
+function updatePayoutGL(index, accountId) {
+    payoutLines[index].gl_account_id = accountId || null;
+    debug.log(`Updated payout ${index} GL to account ${accountId}`);
 }
 
 function calculateTotals() {
@@ -1340,20 +1401,34 @@ function generateJournalEntryPreview() {
             description = `${payment.payment_type} deposits`;
         }
 
-        if (depositAmount !== 0) {
+        if (depositAmount > 0) {
             const account = accounts.find(a => a.id === payment.deposit_account_id);
             lines.push({
                 line: lineNum++,
                 account: account ? `${account.account_number} - ${account.account_name}` : 'Not Mapped',
                 description: description,
-                debit: depositAmount > 0 ? depositAmount : 0,
-                credit: depositAmount < 0 ? Math.abs(depositAmount) : 0
+                debit: depositAmount,
+                credit: 0
             });
-            if (depositAmount > 0) {
-                totalDebits += depositAmount;
-            } else {
-                totalCredits += Math.abs(depositAmount);
+            totalDebits += depositAmount;
+        } else if (depositAmount < 0 && paymentType === 'CASH') {
+            // Negative cash: money from safe
+            const areaId = parseInt(document.getElementById('areaId').value);
+            const area = areas.find(a => a.id === areaId);
+            let safeAccount = null;
+            if (area && area.safe_account_id) {
+                safeAccount = accounts.find(a => a.id === area.safe_account_id);
             }
+            const useAccount = safeAccount || accounts.find(a => a.id === payment.deposit_account_id);
+            const useDesc = safeAccount ? 'Safe funds used for tip payouts' : description;
+            lines.push({
+                line: lineNum++,
+                account: useAccount ? `${useAccount.account_number} - ${useAccount.account_name}` : 'Not Mapped',
+                description: useDesc,
+                debit: 0,
+                credit: Math.abs(depositAmount)
+            });
+            totalCredits += Math.abs(depositAmount);
         }
     });
 
@@ -1757,7 +1832,8 @@ async function saveDSS() {
         discountLines.forEach(line => {
             if (line.discount_name && line.amount) {
                 // Store as negative values (matching how they're stored in the database)
-                discountBreakdown[line.discount_name] = -Math.abs(parseFloat(line.amount) || 0);
+                const amt = parseFloat(line.amount) || 0;
+                discountBreakdown[line.discount_name] = -Math.abs(amt);
             }
         });
 
@@ -1787,6 +1863,13 @@ async function saveDSS() {
                 deposit_account_id: line.deposit_account_id,
                 amount: parseFloat(line.amount) || 0,
                 tips: parseFloat(line.tips) || 0
+            })),
+            payout_breakdown: payoutLines.map(line => ({
+                timestamp: line.timestamp,
+                employee: line.employee,
+                note: line.note,
+                amount: parseFloat(line.amount) || 0,
+                gl_account_id: line.gl_account_id || null
             }))
         };
 

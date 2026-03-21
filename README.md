@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** March 20, 2026
+**Last Updated:** March 21, 2026
 **Status:** ~98% Complete - All 11 Systems Production Ready ✅
-**Latest:** GFS CSV parsing, PDF reference invoices, DSS GL validation, vendor dedup improvements (Mar 20, 2026) ✅
+**Latest:** DSS discount scaling, safe account routing, payout GL lines, payment mapping enforcement (Mar 21, 2026) ✅
 
 ---
 

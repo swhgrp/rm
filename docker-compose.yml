@@ -89,6 +89,7 @@ services:
     volumes:
     - ./accounting/src:/app/src
     - ./accounting/alembic:/app/alembic
+    - ./accounting/scripts:/app/scripts
     - ./accounting/logs:/app/logs
     env_file:
     - ./accounting/.env

@@ -94,6 +94,7 @@ class POSCategoryGLMapping(Base):
     pos_category = Column(String(255), nullable=False)  # e.g., "Food", "Beverages", "Alcohol"
     revenue_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False)
     tax_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="RESTRICT"))  # Sales tax payable account
+    discount_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="RESTRICT"))  # Contra-revenue account for discounts on this category
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -102,19 +103,30 @@ class POSCategoryGLMapping(Base):
     area = relationship("Area")
     revenue_account = relationship("Account", foreign_keys=[revenue_account_id])
     tax_account = relationship("Account", foreign_keys=[tax_account_id])
+    discount_account = relationship("Account", foreign_keys=[discount_account_id])
 
     def __repr__(self):
         return f"<POSCategoryGLMapping(category={self.pos_category}, revenue_account_id={self.revenue_account_id})>"
 
 
 class POSDiscountGLMapping(Base):
-    """Mapping from POS discounts to GL accounts"""
+    """Mapping from POS discounts to GL accounts.
+
+    When is_override=True, this discount always posts to the mapped account
+    regardless of which sales category the discounted item belongs to.
+    (e.g., Staff Meal → 4102 Employee Meals, Waste → 4818)
+
+    When is_override=False (default), category-based routing is used instead
+    and the category's discount_account_id determines the GL account.
+    These mappings serve as fallback for old data without category prefixes.
+    """
     __tablename__ = "pos_discount_gl_mappings"
 
     id = Column(Integer, primary_key=True, index=True)
     area_id = Column(Integer, ForeignKey("areas.id", ondelete="CASCADE"), index=True)
     pos_discount_name = Column(String(255), nullable=False)  # e.g., "Employee Discount", "Happy Hour"
     discount_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False)  # Contra-revenue or expense account
+    is_override = Column(Boolean, nullable=False, default=False)  # True = always use this account, False = use category routing
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -5,7 +5,7 @@ Microservices-based restaurant management platform for SW Hospitality Group.
 - **Production URL:** https://rm.swhgrp.com
 - **Architecture:** 11 FastAPI microservices behind Nginx reverse proxy, each with its own PostgreSQL database
 - **Portal:** Central auth + UI at `/portal/`, serves templates from each service's template directory
-- **Last Updated:** March 20, 2026
+- **Last Updated:** March 21, 2026
 
 ## Infrastructure & Development Environment
 - **Production Server:** Linode Ubuntu instance at `/opt/restaurant-system/`
@@ -238,9 +238,19 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - **Cross-location dedup**: `VendorItemReviewService` now checks `(vendor_id, vendor_sku)` across ALL locations and statuses (including inactive)
 - **Prevents re-creating deactivated items**: Previously only checked within same location
 
-### Daily Sales Summary GL Validation (Mar 2026)
+### Daily Sales Summary System (Mar 2026)
+- **Clover POS sync**: `POSSyncService` pulls orders, payments, discounts, refunds, and payouts from Clover API daily
+- **Discount extraction**: Category-aware breakdown (`Category|DiscountName` keys) with 3-tier GL routing (override → category → fallback)
+- **Proportional discount scaling**: Percentage-based Clover discounts (amount=None, percentage only) are proportionally scaled so breakdown sums exactly to `effective_discounts` (authoritative from payments) — eliminates rounding adjustments
+- **Automated review & post**: `scripts/dss_review_and_post.py` — validates math, GL mappings, duplicates, payouts; auto-posts clean entries, flags issues
+- **Cash deposit logic**: Negative cash deposit (tips exceed cash) credits the location's Safe GL account; positive cash deposits debit the deposit account
+- **Seaside Grill rolling safe**: CASH payment type maps to `1014 - Safe - Seaside Grill` (not 1091); all cash flows through safe as rolling balance
+- **Payout accounting**: Cash payouts from Clover `cash_events` API create DEBIT lines to assigned GL accounts; payouts reduce expected cash deposit
+- **Payment GL enforcement**: No fallback to default accounts for unmapped payment types — sync leaves `deposit_account_id=NULL`, caught during posting validation
 - **Server-side validation**: `post_daily_sales_summary()` validates all category, payment, and discount GL mappings before creating journal entry
 - **Client-side validation**: `postDSS()` JS function checks GL accounts before submitting, displays notification listing missing accounts
+- **Deposit reconciliation**: Managers record actual cash deposit, variance creates Cash Over/Short JE
+- **Area safe accounts**: Each area has `safe_account_id` FK linking to its Safe GL account (1011-1016)
 - **Post-success redirect**: After successful DSS post, redirects to `/accounting/daily-sales` list page
 
 ### Accounting Vendor Reactivation (Mar 2026)

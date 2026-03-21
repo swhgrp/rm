@@ -26,13 +26,21 @@
                         <option value="">All Locations</option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Status</label>
                     <select class="form-select" id="filterStatus" onchange="loadSummaries()">
                         <option value="">All Statuses</option>
                         <option value="draft">Draft</option>
                         <option value="verified">Verified</option>
                         <option value="posted">Posted</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">Review</label>
+                    <select class="form-select" id="filterReview" onchange="loadSummaries()">
+                        <option value="">All</option>
+                        <option value="flagged">Flagged</option>
+                        <option value="clean">Clean</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -206,12 +214,14 @@ async function loadSummaries() {
     try {
         const areaId = document.getElementById('filterArea').value;
         const status = document.getElementById('filterStatus').value;
+        const reviewStatus = document.getElementById('filterReview').value;
         const startDate = document.getElementById('filterStartDate').value;
         const endDate = document.getElementById('filterEndDate').value;
 
         let url = '/accounting/api/daily-sales/?';
         if (areaId) url += `area_id=${areaId}&`;
         if (status) url += `status=${status}&`;
+        if (reviewStatus) url += `review_status=${reviewStatus}&`;
         if (startDate) url += `start_date=${startDate}&`;
         if (endDate) url += `end_date=${endDate}&`;
 
@@ -229,8 +239,21 @@ async function loadSummaries() {
             const area = areas.find(a => a.id === dss.area_id);
             const statusClass = `status-${dss.status.toLowerCase()}`;
 
+            // Build review flag badge
+            let reviewBadge = '';
+            if (dss.review_status === 'flagged') {
+                const notesList = (dss.review_notes || []).map(n => `• ${n}`).join('\n');
+                reviewBadge = `<span class="badge bg-warning text-dark ms-1" role="button"
+                    data-bs-toggle="popover" data-bs-trigger="hover focus"
+                    data-bs-placement="bottom" data-bs-html="true"
+                    data-bs-content="${(dss.review_notes || []).map(n => n.replace(/"/g, '&quot;')).join('<br>')}"
+                    title="Review Issues"><i class="bi bi-exclamation-triangle-fill"></i> Flagged</span>`;
+            } else if (dss.review_status === 'clean') {
+                reviewBadge = `<span class="badge bg-success-subtle text-success ms-1" title="Auto-reviewed clean"><i class="bi bi-check-circle"></i></span>`;
+            }
+
             return `
-                <tr>
+                <tr class="${dss.review_status === 'flagged' ? 'table-warning' : ''}">
                     <td>${dss.business_date}</td>
                     <td>${area ? area.name : dss.area_id}</td>
                     <td>${dss.pos_system ? dss.pos_system.charAt(0).toUpperCase() + dss.pos_system.slice(1) + ' POS' : 'Manual'}</td>
@@ -238,12 +261,17 @@ async function loadSummaries() {
                     <td style="text-align: right;">${formatCurrency(dss.tax_collected)}</td>
                     <td style="text-align: right;">${formatCurrency(dss.tips)}</td>
                     <td style="text-align: right;">${formatCurrency(dss.total_collected)}</td>
-                    <td><span class="badge ${statusClass}">${dss.status.toUpperCase()}</span></td>
+                    <td><span class="badge ${statusClass}">${dss.status.toUpperCase()}</span>${reviewBadge}</td>
                     <td>${dss.journal_entry_id ? `JE-${dss.journal_entry_id}` : '-'}</td>
                     <td>
                         <button class="btn btn-sm btn-outline-primary" onclick="viewDSS(${dss.id})">
                             <i class="bi bi-eye"></i>
                         </button>
+                        ${dss.review_status === 'flagged' ? `
+                            <button class="btn btn-sm btn-outline-warning" onclick="dismissFlag(${dss.id})" title="Dismiss review flag">
+                                <i class="bi bi-x-circle"></i>
+                            </button>
+                        ` : ''}
                         ${dss.status !== 'posted' ? `
                             <button class="btn btn-sm btn-outline-danger" onclick="deleteDSS(${dss.id})" title="${dss.status === 'draft' ? 'Delete entry' : 'Delete entry (admin only)'}">
                                 <i class="bi bi-trash"></i>
@@ -253,6 +281,11 @@ async function loadSummaries() {
                 </tr>
             `;
         }).join('');
+
+        // Initialize Bootstrap popovers for flagged entries
+        document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
+            new bootstrap.Popover(el);
+        });
     } catch (error) {
         console.error('Error loading summaries:', error);
         showNotification('Error loading sales summaries: ' + error.message, 'Error');
@@ -353,6 +386,29 @@ async function deleteDSS(id) {
         loadSummaries();
     } catch (error) {
         console.error('Error deleting DSS:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+async function dismissFlag(id) {
+    if (!await showConfirm('Dismiss the review flag on this entry?', 'Dismiss Flag')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/daily-sales/${id}/dismiss-flag`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to dismiss flag');
+        }
+
+        showNotification('Review flag dismissed', 'Success');
+        loadSummaries();
+    } catch (error) {
+        console.error('Error dismissing flag:', error);
         showNotification('Error: ' + error.message, 'Error');
     }
 }

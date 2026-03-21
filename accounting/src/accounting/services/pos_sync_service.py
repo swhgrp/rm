@@ -214,14 +214,13 @@ class POSSyncService:
                     )
                     all_cash_events = cash_events_response.get("elements", [])
 
-                    # Filter cash events within date range - only include CASH_ADJUSTMENT type (payouts)
+                    # Filter cash events within date range - only include ADJUSTMENT type (payouts)
                     for event in all_cash_events:
                         event_time = event.get("timestamp", 0)
                         if day_start_ms <= event_time <= day_end_ms:
-                            # CASH_ADJUSTMENT events are payouts/drops
-                            # Negative amounts = money taken OUT (payout)
-                            # Positive amounts = money added IN
-                            if event.get("type") == "CASH_ADJUSTMENT":
+                            # ADJUSTMENT events are payouts/drops (Clover uses "ADJUSTMENT", not "CASH_ADJUSTMENT")
+                            # amountChange field: negative = money taken OUT (payout), positive = money added IN
+                            if event.get("type") in ("ADJUSTMENT", "CASH_ADJUSTMENT"):
                                 day_payouts.append(event)
                 except Exception as cash_events_error:
                     # Cash events endpoint may require additional permissions
@@ -726,40 +725,62 @@ class POSSyncService:
                     # to avoid double-counting when same discount appears in line items
                     order_level_discount_names = set()
 
-                    # Extract discounts from order (order-level discounts)
+                    # Build per-category totals for this order (for proportional distribution of order-level discounts)
+                    order_category_totals = defaultdict(Decimal)
+                    if order.get("lineItems") and order["lineItems"].get("elements"):
+                        for item in order["lineItems"]["elements"]:
+                            if item.get("deleted"):
+                                continue
+                            cat_name = "Uncategorized"
+                            if item.get("item") and item["item"].get("categories") and item["item"]["categories"].get("elements"):
+                                cat_name = item["item"]["categories"]["elements"][0].get("name", "Uncategorized")
+                            ip = Decimal(item.get("price", 0)) / 100
+                            pt = item.get("item", {}).get("priceType") if item.get("item") else None
+                            if pt == "PER_UNIT":
+                                iq = Decimal(item.get("unitQty", 1000) or 1000) / Decimal(1000)
+                            else:
+                                iq = Decimal(1)
+                            order_category_totals[cat_name] += ip * iq
+
+                    # Extract discounts: prefer line-item discounts (exact category) over
+                    # order-level proportional distribution. Only use order-level for discounts
+                    # that don't appear on any line items.
+
+                    # First, collect order-level discount info
+                    order_level_discounts = {}  # {disc_name_lower: disc_amount}
                     if order.get("discounts") and order["discounts"].get("elements"):
                         for disc in order["discounts"]["elements"]:
                             disc_name = disc.get("name", "Unknown Discount")
                             order_level_discount_names.add(disc_name.strip().lower())
 
                             if "amount" in disc and disc["amount"]:
-                                # Use Clover's calculated amount (in cents)
                                 disc_amount = abs(Decimal(disc["amount"])) / 100
                             elif "percentage" in disc:
-                                # Clover doesn't provide calculated amounts for percentage discounts
-                                # Calculate from order line items total
-                                # Note: This may be slightly off if discount only applies to some items
                                 percentage = Decimal(disc["percentage"])
                                 disc_amount = order_line_items_total * percentage / 100
                             else:
                                 disc_amount = Decimal('0')
 
                             if disc_amount > 0:
-                                discounts_breakdown[disc_name] += disc_amount
-                                total_discounts += disc_amount
+                                order_level_discounts[disc_name.strip().lower()] = {
+                                    "name": disc_name,
+                                    "amount": disc_amount
+                                }
 
-                    # Extract line item discounts (skip any already counted at order level)
+                    # Second, collect line-item discounts with exact categories
+                    line_item_discount_names = set()  # Track which discounts appear on line items
                     if order.get("lineItems") and order["lineItems"].get("elements"):
                         for item in order["lineItems"]["elements"]:
                             if item.get("deleted"):
                                 continue
                             if item.get("discounts") and item["discounts"].get("elements"):
+                                # Get this item's category
+                                item_category = "Uncategorized"
+                                if item.get("item") and item["item"].get("categories") and item["item"]["categories"].get("elements"):
+                                    item_category = item["item"]["categories"]["elements"][0].get("name", "Uncategorized")
+
                                 for disc in item["discounts"]["elements"]:
                                     disc_name = disc.get("name", "Unknown Discount")
-
-                                    # Skip if already processed at order level
-                                    if disc_name.strip().lower() in order_level_discount_names:
-                                        continue
 
                                     if "amount" in disc and disc["amount"]:
                                         disc_amount = abs(Decimal(disc["amount"])) / 100
@@ -780,8 +801,38 @@ class POSSyncService:
                                         disc_amount = Decimal('0')
 
                                     if disc_amount > 0:
-                                        discounts_breakdown[disc_name] += disc_amount
+                                        disc_key = f"{item_category}|{disc_name}"
+                                        discounts_breakdown[disc_key] += disc_amount
                                         total_discounts += disc_amount
+                                        line_item_discount_names.add(disc_name.strip().lower())
+
+                    # Third, for order-level discounts that did NOT appear on any line items,
+                    # distribute proportionally across categories (fallback only)
+                    for disc_name_lower, disc_info in order_level_discounts.items():
+                        if disc_name_lower in line_item_discount_names:
+                            # Already captured from line items with exact categories — skip
+                            continue
+
+                        disc_name = disc_info["name"]
+                        disc_amount = disc_info["amount"]
+                        total_discounts += disc_amount
+
+                        # Distribute proportionally across categories
+                        order_total = sum(order_category_totals.values())
+                        if order_total > 0 and len(order_category_totals) > 0:
+                            remaining = disc_amount
+                            sorted_cats = sorted(order_category_totals.items(), key=lambda x: x[1], reverse=True)
+                            for i, (cat, cat_total) in enumerate(sorted_cats):
+                                if i == len(sorted_cats) - 1:
+                                    cat_disc = remaining
+                                else:
+                                    cat_disc = (disc_amount * cat_total / order_total).quantize(Decimal('0.01'))
+                                    remaining -= cat_disc
+                                if cat_disc > 0:
+                                    disc_key = f"{cat}|{disc_name}"
+                                    discounts_breakdown[disc_key] += cat_disc
+                        else:
+                            discounts_breakdown[disc_name] += disc_amount
 
                     # Extract refunds from order with category breakdown
                     if order.get("refunds") and order["refunds"].get("elements"):
@@ -854,7 +905,9 @@ class POSSyncService:
         total_payouts = Decimal('0')
         payout_breakdown = []
         for payout in payouts:
-            payout_amount = Decimal(payout.get("amount", 0)) / 100
+            # Clover uses "amountChange" field (in cents), fallback to "amount"
+            raw_amount = payout.get("amountChange", payout.get("amount", 0))
+            payout_amount = Decimal(str(raw_amount)) / 100
             # Negative amounts are money taken out (payouts)
             if payout_amount < 0:
                 payout_amount = abs(payout_amount)
@@ -909,18 +962,29 @@ class POSSyncService:
         # This is what should be left in the drawer to deposit
         expected_cash_deposit = cash_amount - cash_tips_paid - total_payouts
 
-        # Check if discount breakdown matches effective_discounts total
-        # The effective_discounts (derived from payments) is the authoritative total
+        # Reconcile discount breakdown to match effective_discounts (authoritative from Clover payments)
+        # Percentage-based discounts may have slight rounding differences vs Clover's internal calc
+        # (e.g., Clover applies percentage AFTER other discounts, we calculate on pre-discount totals)
+        # Fix: proportionally scale all discount amounts so they sum exactly to effective_discounts
         breakdown_sum = sum(discounts_breakdown.values())
         logger.info(f"Discount breakdown: {dict((k, float(v)) for k, v in discounts_breakdown.items())}")
         logger.info(f"Discount breakdown sum: ${float(breakdown_sum):.2f}, effective_discounts: ${float(effective_discounts):.2f}")
         if breakdown_sum > 0 and abs(breakdown_sum - effective_discounts) > Decimal('0.01'):
-            # Add a rounding adjustment entry to reconcile the difference
-            # This preserves the original discount amounts while making the total correct
-            adjustment = effective_discounts - breakdown_sum
-            if abs(adjustment) > Decimal('0.01'):
-                discounts_breakdown["Rounding Adjustment"] = adjustment
-                logger.info(f"Added discount rounding adjustment: ${float(adjustment):.2f} (breakdown was ${float(breakdown_sum):.2f}, expected ${float(effective_discounts):.2f})")
+            # Proportionally scale each discount so the total matches exactly
+            scale_factor = effective_discounts / breakdown_sum
+            scaled_breakdown = defaultdict(Decimal)
+            remaining = effective_discounts
+            sorted_discounts = sorted(discounts_breakdown.items(), key=lambda x: x[1], reverse=True)
+            for i, (disc_key, disc_amount) in enumerate(sorted_discounts):
+                if i == len(sorted_discounts) - 1:
+                    # Last item gets the remainder to avoid rounding drift
+                    scaled_breakdown[disc_key] = remaining
+                else:
+                    scaled_amount = (disc_amount * scale_factor).quantize(Decimal('0.01'))
+                    scaled_breakdown[disc_key] = scaled_amount
+                    remaining -= scaled_amount
+            discounts_breakdown = scaled_breakdown
+            logger.info(f"Scaled discount breakdown to match effective_discounts: {dict((k, float(v)) for k, v in discounts_breakdown.items())}")
 
         # Convert to float for JSON serialization
         order_types_dict = {k: float(v) for k, v in order_types.items()}
@@ -1051,11 +1115,6 @@ class POSSyncService:
 
         payment_mapping_dict = {m.pos_payment_type.upper(): m.deposit_account_id for m in payment_mappings}
 
-        # Fallback: Get default cash account for deposits (1000 - Cash) if no mapping found
-        cash_account = self.db.query(Account).filter(
-            Account.account_number == '1000'
-        ).first()
-
         # Get deposit/payout fields from cache (calculated during sync)
         card_deposit = cached_sale.card_deposit if cached_sale.card_deposit is not None else None
         cash_tips_paid = cached_sale.cash_tips_paid if cached_sale.cash_tips_paid is not None else Decimal('0')
@@ -1164,8 +1223,7 @@ class POSSyncService:
             deposit_account_id = payment_mapping_dict.get(payment_type_upper)
 
             if not deposit_account_id:
-                logger.warning(f"No GL mapping found for payment type '{payment_type}' in area {cached_sale.area_id}, using default cash account")
-                deposit_account_id = cash_account.id if cash_account else None
+                logger.warning(f"No GL mapping found for payment type '{payment_type}' in area {cached_sale.area_id}")
 
             payment = SalesPayment(
                 dss_id=dss.id,

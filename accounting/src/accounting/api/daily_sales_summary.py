@@ -83,6 +83,11 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
     cash_payouts = dss.cash_payouts or Decimal("0.00")
     total_refunds = dss.refunds or Decimal("0.00")
 
+    # Get the area's safe account for negative cash deposit scenarios
+    from accounting.models.area import Area
+    area = db.query(Area).filter(Area.id == dss.area_id).first()
+    safe_account_id = area.safe_account_id if area else None
+
     # DEBIT: Payment methods (Cash, Credit Card, etc.) - Asset accounts
     if dss.payments:
         for payment in dss.payments:
@@ -112,17 +117,44 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
                     deposit_amount = payment.amount
                     description = f"{payment.payment_type} deposits"
 
-                if deposit_amount != 0:
+                if deposit_amount > 0:
+                    # Normal deposit: DEBIT the deposit account
                     lines.append(JournalEntryLine(
                         journal_entry_id=je.id,
                         line_number=line_number,
                         account_id=account_id,
                         area_id=dss.area_id,
                         description=description,
-                        debit_amount=deposit_amount if deposit_amount > 0 else Decimal("0.00"),
-                        credit_amount=abs(deposit_amount) if deposit_amount < 0 else Decimal("0.00")
+                        debit_amount=deposit_amount,
+                        credit_amount=Decimal("0.00")
                     ))
                     line_number += 1
+                elif deposit_amount < 0 and payment_type_upper == 'CASH':
+                    # Negative cash deposit: tips paid exceed cash received
+                    # Money comes FROM the safe — CREDIT the safe account
+                    if safe_account_id:
+                        lines.append(JournalEntryLine(
+                            journal_entry_id=je.id,
+                            line_number=line_number,
+                            account_id=safe_account_id,
+                            area_id=dss.area_id,
+                            description="Safe funds used for tip payouts",
+                            debit_amount=Decimal("0.00"),
+                            credit_amount=abs(deposit_amount)
+                        ))
+                        line_number += 1
+                    else:
+                        # No safe account configured — fall back to cash deposit account
+                        lines.append(JournalEntryLine(
+                            journal_entry_id=je.id,
+                            line_number=line_number,
+                            account_id=account_id,
+                            area_id=dss.area_id,
+                            description=description,
+                            debit_amount=Decimal("0.00"),
+                            credit_amount=abs(deposit_amount)
+                        ))
+                        line_number += 1
     elif dss.payment_breakdown:
         # Use JSONB breakdown if no detailed payment records
         for payment_type, amount in dss.payment_breakdown.items():
@@ -152,15 +184,29 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
                     deposit_amount = base_amount
                     description = f"{payment_type} deposits"
 
-                if deposit_amount != 0:
+                if deposit_amount > 0:
                     lines.append(JournalEntryLine(
                         journal_entry_id=je.id,
                         line_number=line_number,
                         account_id=account_id,
                         area_id=dss.area_id,
                         description=description,
-                        debit_amount=deposit_amount if deposit_amount > 0 else Decimal("0.00"),
-                        credit_amount=abs(deposit_amount) if deposit_amount < 0 else Decimal("0.00")
+                        debit_amount=deposit_amount,
+                        credit_amount=Decimal("0.00")
+                    ))
+                    line_number += 1
+                elif deposit_amount < 0 and payment_type_upper == 'CASH':
+                    # Negative cash: money from safe
+                    use_account = safe_account_id or account_id
+                    use_desc = "Safe funds used for tip payouts" if safe_account_id else description
+                    lines.append(JournalEntryLine(
+                        journal_entry_id=je.id,
+                        line_number=line_number,
+                        account_id=use_account,
+                        area_id=dss.area_id,
+                        description=use_desc,
+                        debit_amount=Decimal("0.00"),
+                        credit_amount=abs(deposit_amount)
                     ))
                     line_number += 1
 
@@ -257,8 +303,7 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
     # CREDIT: Sales Tax Payable
     if dss.tax_collected > 0:
         tax_account = db.query(Account).filter(
-            Account.account_type == "LIABILITY",
-            Account.account_name.ilike("%tax%payable%")
+            Account.account_number == "2300"
         ).first()
 
         if not tax_account:
@@ -276,41 +321,87 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
         line_number += 1
 
     # DEBIT: Discounts (contra-revenue or expense accounts)
+    # Discounts can be keyed as "Category|DiscountName" (new format) or plain "DiscountName" (legacy)
     if dss.discount_breakdown:
-        # Import POSDiscountGLMapping to get mapped accounts
-        from accounting.models.pos import POSDiscountGLMapping
+        from accounting.models.pos import POSDiscountGLMapping, POSCategoryGLMapping
 
-        # Get discount mappings for this area
+        # Get override discount mappings (Staff Meal, Waste, etc.)
         discount_mappings = db.query(POSDiscountGLMapping).filter(
             POSDiscountGLMapping.area_id == dss.area_id,
             POSDiscountGLMapping.is_active == True
         ).all()
 
-        # Create a lookup dictionary
-        discount_map = {m.pos_discount_name: m.discount_account_id for m in discount_mappings}
+        # Override map: only is_override=True entries bypass category routing
+        override_map = {m.pos_discount_name: m.discount_account_id for m in discount_mappings if m.is_override}
+        # Fallback map: all discount name mappings (for legacy data without category prefix)
+        fallback_map = {m.pos_discount_name: m.discount_account_id for m in discount_mappings}
 
-        for discount_name, amount in dss.discount_breakdown.items():
-            discount_amount = abs(Decimal(str(amount)))  # Convert negative to positive
-            if discount_amount > 0:
-                # Get account from mapping
-                account_id = discount_map.get(discount_name)
+        # Get category → discount account mappings
+        category_mappings = db.query(POSCategoryGLMapping).filter(
+            POSCategoryGLMapping.area_id == dss.area_id,
+            POSCategoryGLMapping.is_active == True,
+            POSCategoryGLMapping.discount_account_id.isnot(None)
+        ).all()
+        category_discount_map = {m.pos_category: m.discount_account_id for m in category_mappings}
 
-                if not account_id:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"No discount account mapped for discount: {discount_name}. Please configure in POS Settings."
-                    )
+        # Aggregate by GL account to consolidate lines (e.g., "Beer|PBC Staff" + "Beer|6 Pack" → one 4153 line)
+        discount_gl_lines = {}  # {account_id: {"amount": Decimal, "descriptions": [str]}}
 
-                lines.append(JournalEntryLine(
-                    journal_entry_id=je.id,
-                    line_number=line_number,
-                    account_id=account_id,
-                    area_id=dss.area_id,
-                    description=f"{discount_name}",
-                    debit_amount=discount_amount,
-                    credit_amount=Decimal("0.00")
-                ))
-                line_number += 1
+        for discount_key, amount in dss.discount_breakdown.items():
+            raw_amount = Decimal(str(amount))
+            discount_amount = abs(raw_amount)
+            if discount_amount <= 0:
+                continue
+
+            # Parse category and discount name from key
+            if "|" in discount_key:
+                category, disc_name = discount_key.split("|", 1)
+            else:
+                category = None
+                disc_name = discount_key
+
+            # Determine GL account:
+            # 1. Check override mappings (Staff Meal, Waste, etc.)
+            account_id = override_map.get(disc_name)
+
+            # 2. If not an override and we have category info, use category routing
+            if not account_id and category:
+                account_id = category_discount_map.get(category)
+
+            # 3. Fallback to per-discount-name mapping (legacy behavior)
+            if not account_id:
+                account_id = fallback_map.get(disc_name)
+
+            if not account_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No discount account mapped for discount: {discount_key}. "
+                           f"Please configure category discount accounts in POS Settings."
+                )
+
+            if account_id not in discount_gl_lines:
+                discount_gl_lines[account_id] = {"amount": Decimal("0.00"), "descriptions": []}
+            discount_gl_lines[account_id]["amount"] += discount_amount
+            discount_gl_lines[account_id]["descriptions"].append(disc_name)
+
+        for account_id, info in discount_gl_lines.items():
+            # Build description from unique discount names
+            unique_names = list(dict.fromkeys(info["descriptions"]))  # preserve order, remove dupes
+            if len(unique_names) <= 3:
+                description = ", ".join(unique_names)
+            else:
+                description = f"{unique_names[0]} + {len(unique_names) - 1} more"
+
+            lines.append(JournalEntryLine(
+                journal_entry_id=je.id,
+                line_number=line_number,
+                account_id=account_id,
+                area_id=dss.area_id,
+                description=description,
+                debit_amount=info["amount"],
+                credit_amount=Decimal("0.00")
+            ))
+            line_number += 1
 
     # DEBIT: Refunds by category (debit the original sale category's revenue account)
     if dss.refunds and dss.refunds > 0:
@@ -386,6 +477,24 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
                 credit_amount=Decimal("0.00")
             ))
             line_number += 1
+
+    # DEBIT: Cash payouts (expense accounts for money taken from drawer)
+    if dss.payout_breakdown and isinstance(dss.payout_breakdown, list):
+        for payout in dss.payout_breakdown:
+            payout_amount = Decimal(str(payout.get("amount", 0)))
+            gl_account_id = payout.get("gl_account_id")
+            if payout_amount > 0 and gl_account_id:
+                payout_note = payout.get("note", "Cash payout")
+                lines.append(JournalEntryLine(
+                    journal_entry_id=je.id,
+                    line_number=line_number,
+                    account_id=gl_account_id,
+                    area_id=dss.area_id,
+                    description=f"Cash payout: {payout_note}",
+                    debit_amount=payout_amount,
+                    credit_amount=Decimal("0.00")
+                ))
+                line_number += 1
 
     # Add all lines to JE
     je.lines = lines
@@ -468,6 +577,7 @@ def list_daily_sales_summaries(
     limit: int = 100,
     area_id: Optional[int] = None,
     status: Optional[str] = None,
+    review_status: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_db),
@@ -482,6 +592,11 @@ def list_daily_sales_summaries(
         query = query.filter(DailySalesSummary.area_id == area_id)
     if status:
         query = query.filter(DailySalesSummary.status == status)
+    if review_status:
+        if review_status == 'flagged':
+            query = query.filter(DailySalesSummary.review_status == 'flagged')
+        elif review_status == 'clean':
+            query = query.filter(DailySalesSummary.review_status == 'clean')
     if start_date:
         query = query.filter(DailySalesSummary.business_date >= start_date)
     if end_date:
@@ -987,6 +1102,28 @@ def reopen_daily_sales_summary(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error reopening DSS: {str(e)}")
+
+
+# ============================================================================
+# AI Review Endpoints
+# ============================================================================
+
+@router.post("/{dss_id}/dismiss-flag", response_model=DSSSchema)
+def dismiss_review_flag(
+    dss_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """Dismiss AI review flag on a DSS entry"""
+    dss = db.query(DailySalesSummary).filter(DailySalesSummary.id == dss_id).first()
+    if not dss:
+        raise HTTPException(status_code=404, detail="Daily sales summary not found")
+
+    dss.review_status = None
+    dss.review_notes = None
+    db.commit()
+    db.refresh(dss)
+    return dss
 
 
 # ============================================================================

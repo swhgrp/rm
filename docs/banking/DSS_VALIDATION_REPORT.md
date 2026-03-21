@@ -143,6 +143,18 @@ BALANCED ✅
 
 **Verdict:** Journal entry structure is perfect for bank reconciliation. Undeposited Funds accounts will be cleared when bank deposits are matched.
 
+### Updated JE Structure (Mar 2026)
+
+The DSS journal entry has been enhanced with:
+
+- **Negative cash deposit handling**: When tips paid exceed cash received, the JE credits the location's **Safe GL account** (1011-1016) instead of 1091, keeping safe balances accurate
+- **Seaside Grill rolling safe**: CASH payment maps to `1014 - Safe` (not 1091); all cash flows through safe
+- **Cash payout lines**: DEBIT to assigned GL accounts for cash payouts from the drawer
+- **Category-aware discount routing**: Discounts keyed as `Category|DiscountName` route to category-specific contra-revenue accounts (e.g., Beer discounts → 4153, Food discounts → 4101)
+- **Proportional discount scaling**: Percentage-based Clover discounts are scaled to match the authoritative `effective_discounts` total from payment data — no rounding adjustments
+- **Third-party deposits**: DoorDash, Uber Eats → 1095 (Undeposited Funds - Third Party Orders)
+- **No default GL fallback**: Unmapped payment types are rejected at posting, not silently assigned to Cash
+
 ---
 
 ## 4. Payment Breakdown Validation

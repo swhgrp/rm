@@ -420,6 +420,22 @@ def create_transaction(
     return db_transaction
 
 
+@router.get("/transactions/{transaction_id}", response_model=BankTransactionResponse)
+def get_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get a single bank transaction by ID"""
+    transaction = db.query(BankTransaction).filter(
+        BankTransaction.id == transaction_id
+    ).first()
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    transaction.suggested_matches = []
+    return transaction
+
+
 @router.put("/transactions/{transaction_id}", response_model=BankTransactionResponse)
 def update_transaction(
     transaction_id: int,

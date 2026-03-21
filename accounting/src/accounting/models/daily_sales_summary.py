@@ -66,6 +66,11 @@ class DailySalesSummary(Base):
     pos_sync_date = Column(DateTime, nullable=True)
     pos_transaction_count = Column(Integer, nullable=True)
 
+    # AI review fields
+    review_status = Column(String(20), nullable=True, index=True)  # null=not reviewed, 'clean'=auto-posted, 'flagged'=needs attention
+    review_notes = Column(JSONB, nullable=True)  # List of issues found by AI review
+    reviewed_at = Column(DateTime, nullable=True)
+
     # Audit fields
     created_by = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     created_at = Column(DateTime, nullable=False, server_default=func.now())

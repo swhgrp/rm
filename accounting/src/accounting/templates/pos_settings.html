@@ -212,6 +212,7 @@
                             <tr>
                                 <th>POS Category</th>
                                 <th>Revenue Account</th>
+                                <th>Discount Account</th>
                                 <th>Tax Account</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -219,7 +220,7 @@
                         </thead>
                         <tbody id="mappingsBody">
                             <tr>
-                                <td colspan="5" class="text-center text-muted">No category mappings configured</td>
+                                <td colspan="6" class="text-center text-muted">No category mappings configured</td>
                             </tr>
                         </tbody>
                     </table>
@@ -339,6 +340,14 @@
                         </select>
                     </div>
 
+                    <div class="mb-3">
+                        <label for="discountAccountIdCategory" class="form-label">Discount GL Account (Optional)</label>
+                        <select id="discountAccountIdCategory" class="form-select">
+                            <option value="">-- Select Account --</option>
+                        </select>
+                        <small class="text-muted">Contra-revenue account for discounts on items in this category (e.g., Beer → 4153 Discount Beer)</small>
+                    </div>
+
                     <div class="form-check mb-3">
                         <input type="checkbox" id="mappingIsActive" class="form-check-input" checked>
                         <label class="form-check-label" for="mappingIsActive">
@@ -380,6 +389,14 @@
                             <option value="">-- Select Account --</option>
                         </select>
                         <small class="text-muted">Typically a contra-revenue account (4xxx)</small>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" id="discountIsOverride" class="form-check-input">
+                        <label class="form-check-label" for="discountIsOverride">
+                            Always use this account (override category routing)
+                        </label>
+                        <br><small class="text-muted">Check for special discounts like Staff Meal, Waste — bypasses category-based routing</small>
                     </div>
 
                     <div class="form-check mb-3">
@@ -509,12 +526,20 @@ async function loadAccounts() {
         const revenueSelect = document.getElementById('revenueAccountId');
         const taxSelect = document.getElementById('taxAccountId');
 
+        const discountCategorySelect = document.getElementById('discountAccountIdCategory');
+
         accounts.forEach(account => {
             if (account.account_number >= 4000 && account.account_number < 5000) {
                 const option = document.createElement('option');
                 option.value = account.id;
                 option.textContent = `${account.account_number} - ${account.account_name}`;
                 revenueSelect.appendChild(option);
+
+                // Discount accounts are also in 4xxx range (contra-revenue)
+                const option2 = document.createElement('option');
+                option2.value = account.id;
+                option2.textContent = `${account.account_number} - ${account.account_name}`;
+                discountCategorySelect.appendChild(option2);
             }
 
             // Tax accounts (typically 2000-2999 range)
@@ -924,18 +949,20 @@ async function loadCategoryMappings(areaId) {
         const tbody = document.getElementById('mappingsBody');
 
         if (mappings.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No category mappings configured</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No category mappings configured</td></tr>';
             return;
         }
 
         tbody.innerHTML = mappings.map(mapping => {
             const revenueAccount = accounts.find(a => a.id === mapping.revenue_account_id);
+            const discountAccount = mapping.discount_account_id ? accounts.find(a => a.id === mapping.discount_account_id) : null;
             const taxAccount = mapping.tax_account_id ? accounts.find(a => a.id === mapping.tax_account_id) : null;
 
             return `
                 <tr>
                     <td><strong>${mapping.pos_category}</strong></td>
                     <td>${revenueAccount ? `${revenueAccount.account_number} - ${revenueAccount.account_name}` : 'N/A'}</td>
+                    <td>${discountAccount ? `${discountAccount.account_number} - ${discountAccount.account_name}` : '<span class="text-warning">Not set</span>'}</td>
                     <td>${taxAccount ? `${taxAccount.account_number} - ${taxAccount.account_name}` : 'N/A'}</td>
                     <td>
                         <span class="badge ${mapping.is_active ? 'badge-success' : 'badge-secondary'}">
@@ -984,6 +1011,7 @@ function editMapping(id) {
     document.getElementById('posCategory').value = mapping.pos_category;
     document.getElementById('revenueAccountId').value = mapping.revenue_account_id;
     document.getElementById('taxAccountId').value = mapping.tax_account_id || '';
+    document.getElementById('discountAccountIdCategory').value = mapping.discount_account_id || '';
     document.getElementById('mappingIsActive').checked = mapping.is_active;
 
     const modal = new bootstrap.Modal(document.getElementById('mappingModal'));
@@ -998,6 +1026,7 @@ async function saveCategoryMapping() {
         pos_category: document.getElementById('posCategory').value,
         revenue_account_id: parseInt(document.getElementById('revenueAccountId').value),
         tax_account_id: document.getElementById('taxAccountId').value ? parseInt(document.getElementById('taxAccountId').value) : null,
+        discount_account_id: document.getElementById('discountAccountIdCategory').value ? parseInt(document.getElementById('discountAccountIdCategory').value) : null,
         is_active: document.getElementById('mappingIsActive').checked
     };
 
@@ -1266,7 +1295,9 @@ async function loadDiscountMappings(areaId) {
 
             const row = `
                 <tr>
-                    <td>${mapping.pos_discount_name}</td>
+                    <td>${mapping.pos_discount_name}
+                        ${mapping.is_override ? '<span class="badge bg-info ms-1" title="Always uses this account regardless of item category">Override</span>' : ''}
+                    </td>
                     <td>${accountDisplay}</td>
                     <td>
                         <span class="badge ${mapping.is_active ? 'bg-success' : 'bg-secondary'}">
@@ -1316,6 +1347,7 @@ function showAddDiscountMappingModal() {
     document.getElementById('discountMappingId').value = '';
     document.getElementById('posDiscountName').value = '';
     document.getElementById('discountAccountId').value = '';
+    document.getElementById('discountIsOverride').checked = false;
     document.getElementById('discountMappingIsActive').checked = true;
     document.getElementById('discountMappingModalTitle').textContent = 'Add Discount Mapping';
 
@@ -1338,6 +1370,7 @@ async function saveDiscountMapping() {
         area_id: parseInt(currentAreaId),
         pos_discount_name: document.getElementById('posDiscountName').value.trim(),
         discount_account_id: parseInt(document.getElementById('discountAccountId').value),
+        is_override: document.getElementById('discountIsOverride').checked,
         is_active: document.getElementById('discountMappingIsActive').checked
     };
 
@@ -1379,6 +1412,7 @@ async function editDiscountMapping(id) {
 
     document.getElementById('discountMappingId').value = mapping.id;
     document.getElementById('posDiscountName').value = mapping.pos_discount_name;
+    document.getElementById('discountIsOverride').checked = mapping.is_override || false;
     document.getElementById('discountMappingIsActive').checked = mapping.is_active;
     document.getElementById('discountMappingModalTitle').textContent = 'Edit Discount Mapping';
 

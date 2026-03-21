@@ -80,6 +80,7 @@ class POSCategoryGLMappingBase(BaseModel):
     pos_category: str = Field(..., description="POS category name (e.g., Food, Beverages, Alcohol)")
     revenue_account_id: int = Field(..., description="GL revenue account ID")
     tax_account_id: Optional[int] = Field(None, description="GL sales tax payable account ID")
+    discount_account_id: Optional[int] = Field(None, description="GL contra-revenue account for discounts on this category")
     is_active: bool = Field(default=True)
 
 
@@ -92,6 +93,7 @@ class POSCategoryGLMappingUpdate(BaseModel):
     """Schema for updating category mapping"""
     revenue_account_id: Optional[int] = None
     tax_account_id: Optional[int] = None
+    discount_account_id: Optional[int] = None
     is_active: Optional[bool] = None
 
 
@@ -112,6 +114,7 @@ class POSDiscountGLMappingBase(BaseModel):
     """Base schema for discount GL mapping"""
     pos_discount_name: str = Field(..., description="POS discount name (e.g., Employee Discount, Happy Hour)")
     discount_account_id: int = Field(..., description="GL account ID for discount (contra-revenue or expense)")
+    is_override: bool = Field(default=False, description="True = always use this account regardless of item category")
     is_active: bool = Field(default=True)
 
 
@@ -124,6 +127,7 @@ class POSDiscountGLMappingUpdate(BaseModel):
     """Schema for updating discount mapping"""
     pos_discount_name: Optional[str] = None
     discount_account_id: Optional[int] = None
+    is_override: Optional[bool] = None
     is_active: Optional[bool] = None
 
 

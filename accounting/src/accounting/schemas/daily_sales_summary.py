@@ -112,6 +112,7 @@ class DailySalesSummaryUpdate(BaseModel):
     discount_breakdown: Optional[Dict[str, Any]] = None
     refund_breakdown: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
+    payout_breakdown: Optional[List[Dict[str, Any]]] = None
     line_items: Optional[List[SalesLineItemCreate]] = None
     payments: Optional[List[SalesPaymentCreate]] = None
 
@@ -128,6 +129,11 @@ class DailySalesSummary(DailySalesSummaryBase):
     posted_by: Optional[int] = None
     posted_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+    # AI review fields
+    review_status: Optional[str] = None
+    review_notes: Optional[List[str]] = None
+    reviewed_at: Optional[datetime] = None
 
     # Deposit and payout fields
     card_deposit: Optional[Decimal] = None
@@ -164,6 +170,11 @@ class DailySalesSummaryList(BaseModel):
     status: str
     journal_entry_id: Optional[int] = None
     created_at: datetime
+
+    # AI review fields
+    review_status: Optional[str] = None
+    review_notes: Optional[List[str]] = None
+    reviewed_at: Optional[datetime] = None
 
     # Cash reconciliation fields
     expected_cash_deposit: Optional[Decimal] = None

@@ -138,6 +138,12 @@
 </div>
 
 <script>
+function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    const [y, m, d] = dateStr.split('T')[0].split('-');
+    return new Date(y, m - 1, d).toLocaleDateString();
+}
+
 let reconciliations = [];
 let bankAccounts = [];
 
@@ -243,8 +249,8 @@ function renderReconciliations() {
                 data-statement-date="${recon.statement_date}"
                 data-recon-date="${recon.reconciliation_date}">
                 <td>${account ? account.account_name : `Account ${recon.bank_account_id}`}</td>
-                <td>${new Date(recon.statement_date).toLocaleDateString()}</td>
-                <td>${new Date(recon.reconciliation_date).toLocaleDateString()}</td>
+                <td>${formatDate(recon.statement_date)}</td>
+                <td>${formatDate(recon.reconciliation_date)}</td>
                 <td class="text-end">$${parseFloat(recon.beginning_balance).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-end">$${parseFloat(recon.ending_balance).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-end ${Math.abs(difference) < 0.01 ? 'text-success' : 'text-danger'}">

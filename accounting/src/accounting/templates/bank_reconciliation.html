@@ -339,6 +339,13 @@
 </style>
 
 <script>
+// Parse date strings without timezone shift (YYYY-MM-DD → local date)
+function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    const [y, m, d] = dateStr.split('T')[0].split('-');
+    return new Date(y, m - 1, d).toLocaleDateString();
+}
+
 let currentBankAccountId = null;
 let currentTransactionId = null;
 let currentSuggestedAccountId = null;  // Track what the system suggested for learning
@@ -478,6 +485,29 @@ async function loadTransactions() {
     }
 }
 
+// Lightweight refresh: update a single transaction in-place without reloading everything
+async function refreshTransaction(transactionId) {
+    try {
+        const response = await fetch(`/accounting/api/bank-accounts/transactions/${transactionId}`);
+        if (response.ok) {
+            const updated = await response.json();
+            const idx = allTransactions.findIndex(t => t.id === transactionId);
+            if (idx !== -1) {
+                // Preserve vendor info and GL suggestions we already loaded
+                updated.vendorInfo = allTransactions[idx].vendorInfo;
+                updated.glSuggestions = allTransactions[idx].glSuggestions;
+                allTransactions[idx] = updated;
+            }
+            filterTransactions();
+        } else {
+            // Fallback to full reload if single-transaction endpoint not available
+            loadTransactions();
+        }
+    } catch (error) {
+        loadTransactions();
+    }
+}
+
 // Fetch GL suggestions for a transaction (lightweight — for inline display)
 async function fetchGLSuggestions(transactionId) {
     try {
@@ -556,7 +586,7 @@ function renderTransactions(transactions) {
 
         // Date
         const dateCell = document.createElement('td');
-        dateCell.textContent = new Date(transaction.transaction_date).toLocaleDateString();
+        dateCell.textContent = formatDate(transaction.transaction_date);
         row.appendChild(dateCell);
 
         // Description with vendor badges
@@ -715,7 +745,7 @@ async function showOpenBills(transactionId) {
         }
 
         document.getElementById('modalTransactionInfo').textContent =
-            `Transaction: ${formatCurrency(billsData.bank_amount)} on ${new Date(billsData.bank_date).toLocaleDateString()} - ${billsData.bank_description}`;
+            `Transaction: ${formatCurrency(billsData.bank_amount)} on ${formatDate(billsData.bank_date)} - ${billsData.bank_description}`;
 
         document.getElementById('transactionAmount').textContent = formatCurrency(Math.abs(parseFloat(billsData.bank_amount)));
 
@@ -766,12 +796,12 @@ function renderOpenBills() {
 
         // Bill Date
         const billDateCell = document.createElement('td');
-        billDateCell.textContent = new Date(bill.bill_date).toLocaleDateString();
+        billDateCell.textContent = formatDate(bill.bill_date);
         row.appendChild(billDateCell);
 
         // Due Date
         const dueDateCell = document.createElement('td');
-        dueDateCell.textContent = bill.due_date ? new Date(bill.due_date).toLocaleDateString() : 'N/A';
+        dueDateCell.textContent = bill.due_date ? formatDate(bill.due_date) : 'N/A';
         row.appendChild(dueDateCell);
 
         // Total Amount
@@ -889,7 +919,7 @@ async function confirmMatch() {
             const result = await response.json();
             showToast(`Successfully matched ${selectedBills.length} bill(s)!`, 'success');
             closeOpenBillsModal();
-            loadTransactions(); // Reload to update status
+            refreshTransaction(currentTransactionId);
         } else {
             const error = await response.json();
             showToast(`Error: ${error.detail || 'Failed to match bills'}`, 'danger');
@@ -923,7 +953,7 @@ async function showGLAssignment(transactionId) {
     }
 
     // Populate transaction details
-    document.getElementById('glTransactionDate').textContent = new Date(transaction.transaction_date).toLocaleDateString();
+    document.getElementById('glTransactionDate').textContent = formatDate(transaction.transaction_date);
     document.getElementById('glTransactionDesc').textContent = transaction.description;
     document.getElementById('glTransactionAmount').textContent = formatCurrency(transaction.amount);
 
@@ -957,7 +987,7 @@ async function editGLAssignment(transactionId, description) {
     }
 
     // Populate transaction details
-    document.getElementById('glTransactionDate').textContent = new Date(transaction.transaction_date).toLocaleDateString();
+    document.getElementById('glTransactionDate').textContent = formatDate(transaction.transaction_date);
     document.getElementById('glTransactionDesc').textContent = transaction.description;
     document.getElementById('glTransactionAmount').textContent = formatCurrency(transaction.amount);
 
@@ -1305,8 +1335,8 @@ async function confirmGLAssignment() {
                 modal.hide();
             }
 
-            // Reload transactions
-            loadTransactions();
+            // Update just this transaction
+            refreshTransaction(currentTransactionId);
         } else {
             const error = await response.json();
             showToast(`Error: ${error.detail || 'Failed to assign to GL'}`, 'danger');
@@ -1448,7 +1478,7 @@ async function verifyAndApproveAutoMatch(transactionId, accountId) {
 
         if (response.ok) {
             showToast('Auto-match verified and approved!', 'success');
-            loadTransactions(); // Reload to update status
+            refreshTransaction(transactionId);
         } else {
             const error = await response.json();
             showToast(`Error: ${error.detail || 'Failed to verify auto-match'}`, 'danger');
@@ -1486,7 +1516,7 @@ async function rejectAutoMatch(transactionId) {
 
         if (response.ok) {
             showToast('Auto-match rejected. Transaction remains unreconciled.', 'info');
-            loadTransactions(); // Reload to update status
+            refreshTransaction(transactionId);
         } else {
             const error = await response.json();
             showToast(`Error: ${error.detail || 'Failed to reject auto-match'}`, 'danger');

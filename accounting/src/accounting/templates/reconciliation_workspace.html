@@ -479,6 +479,12 @@
 </style>
 
 <script>
+function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    const [y, m, d] = dateStr.split('T')[0].split('-');
+    return new Date(y, m - 1, d).toLocaleDateString();
+}
+
 const reconciliationId = {{ reconciliation_id }};
 let reconciliation = null;
 let bankAccount = null;
@@ -535,13 +541,13 @@ function renderWorkspace() {
     `;
 
     document.getElementById('reconciliationInfo').textContent =
-        `Statement Date: ${new Date(reconciliation.statement_date).toLocaleDateString()} • Reconciliation Date: ${new Date(reconciliation.reconciliation_date).toLocaleDateString()}`;
+        `Statement Date: ${formatDate(reconciliation.statement_date)} • Reconciliation Date: ${formatDate(reconciliation.reconciliation_date)}`;
 
     // Update summary cards
     document.getElementById('statementBalance').textContent =
         `$${parseFloat(reconciliation.ending_balance).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     document.getElementById('statementDate').textContent =
-        `As of ${new Date(reconciliation.statement_date).toLocaleDateString()}`;
+        `As of ${formatDate(reconciliation.statement_date)}`;
 
     // Render transactions
     renderBankTransactions();
@@ -574,7 +580,7 @@ function renderBankTransactions() {
                            ${isCleared ? 'checked disabled' : ''}
                            onchange="onBankCheckboxChange(this)">
                 </td>
-                <td>${new Date(txn.transaction_date).toLocaleDateString()}</td>
+                <td>${formatDate(txn.transaction_date)}</td>
                 <td>
                     <small>${txn.description || '-'}</small>
                     ${txn.check_number ? `<br><span class="badge bg-secondary">Check #${txn.check_number}</span>` : ''}
@@ -615,7 +621,7 @@ function renderGLEntries() {
                            ${isCleared ? 'checked disabled' : ''}
                            onchange="onGLCheckboxChange(this)">
                 </td>
-                <td>${new Date(entry.journal_entry.entry_date).toLocaleDateString()}</td>
+                <td>${formatDate(entry.journal_entry.entry_date)}</td>
                 <td>
                     <small>${entry.journal_entry.description || '-'}</small>
                     <br><span class="text-muted small">JE-${entry.journal_entry.id}</span>
@@ -989,7 +995,7 @@ async function openCompositeMatch(bankTransactionId) {
 
     // Update modal with transaction info
     document.getElementById('compositeDepositDate').textContent =
-        new Date(currentBankTransaction.transaction_date).toLocaleDateString();
+        formatDate(currentBankTransaction.transaction_date);
     document.getElementById('compositeDepositDesc').textContent =
         currentBankTransaction.description || '-';
 
@@ -1087,7 +1093,7 @@ function renderUndepositedLines() {
                        ${selectedLineIds.includes(line.id) ? 'checked' : ''}
                        onchange="event.stopPropagation(); toggleLineSelection(${line.id})">
             </td>
-            <td><small>${new Date(line.journal_entry_date).toLocaleDateString()}</small></td>
+            <td><small>${formatDate(line.journal_entry_date)}</small></td>
             <td><small>${line.journal_entry_number}</small></td>
             <td><small>${line.account_code} - ${line.account_name}</small></td>
             <td><small>${line.area_name || '-'}</small></td>
