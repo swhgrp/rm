@@ -5,7 +5,7 @@ Microservices-based restaurant management platform for SW Hospitality Group.
 - **Production URL:** https://rm.swhgrp.com
 - **Architecture:** 11 FastAPI microservices behind Nginx reverse proxy, each with its own PostgreSQL database
 - **Portal:** Central auth + UI at `/portal/`, serves templates from each service's template directory
-- **Last Updated:** March 21, 2026
+- **Last Updated:** March 25, 2026
 
 ## Infrastructure & Development Environment
 - **Production Server:** Linode Ubuntu instance at `/opt/restaurant-system/`
@@ -205,8 +205,11 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 ### CSV Expected Vendors & PDF Reference Status (Mar 2026)
 - **CSV expected vendors**: `csv_expected_vendors` table tracks vendor+location combos where CSV invoices are the primary format
 - **`pdf_reference` status**: When a PDF invoice arrives for a CSV-expected vendor, it's stored as reference only (not parsed/mapped)
-- **PDF-to-CSV replacement**: When CSV arrives and a matching PDF invoice exists (same number+location), CSV data replaces the PDF data
-- **Model**: `CsvExpectedVendor` with `vendor_id`, `location_id`, `is_active`, seeded with beverage distributors across all 6 locations
+- **PDF-to-CSV replacement**: When CSV arrives and a matching PDF invoice exists (same number+location), CSV data replaces the PDF data — regardless of current status (including `sent`)
+- **Sent invoice reset**: When CSV replaces a previously-sent invoice, `inventory_sent`/`accounting_sent` flags are cleared for re-sync
+- **Leading-zero matching**: Invoice number comparison strips leading zeros (e.g., `0903123` matches `903123`)
+- **GFS included**: GFS (vendor_id=5) added to csv_expected_vendors for all 6 locations — PDFs auto-tagged as `pdf_reference`
+- **Model**: `CsvExpectedVendor` with `vendor_id`, `location_id`, `is_active`, seeded with beverage distributors + GFS across all 6 locations
 - **Service**: `csv_preference.py` — `is_csv_expected()` with in-memory caching
 - **UI**: `pdf_reference` status shown as "PDF Reference" badge; grouped under "Statements" tab in invoice list
 - **Migration**: `20260318_0001_add_csv_expected_vendors.py`
@@ -279,6 +282,8 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - **GL learning improvements**: Stop-word filtering, reordered pattern priority, competing pattern deactivation
 - **Batch GL suggestions**: `POST /batch-gl-suggestions` — loads suggestions for multiple transactions in one call
 - **Reconciliation UI**: Default filter = "Unreconciled Only", added search bar, inline GL suggestion badges, `quickAssignGL()` function
+- **Split GL assignment**: `POST /transactions/{id}/assign-gl-split` — split a bank transaction across multiple GL accounts (e.g., tax payments to 3 different tax GLs)
+- **Split UI**: Toggle between "Single Account" and "Split Across Accounts" modes in GL assignment modal; dynamic line add/remove with running total and remaining balance
 - **Dashboard GL Variance**: Changed from bank vs GL balance to sum of unreconciled transactions
 - **Custom date range**: Banking dashboard now supports custom date range picker
 
@@ -303,7 +308,9 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - **`needs_review` status**: sits between 'mapping' and 'ready', blocks auto-send
 - **Low-confidence hold**: fuzzy_name mappings with confidence < 0.8 trigger `needs_review`
 - **Auto-reparse**: `email_monitor.py` triggers `reparse_with_vendor_rules()` after first parse if vendor has rules
-- **Approve endpoint**: `POST /api/invoices/{id}/approve-review` clears flags, re-evaluates status
+- **Approve endpoint**: `POST /api/invoices/{id}/approve-review` clears flags, re-evaluates status; 0-item invoices auto-set to `statement`
+- **Mark as Statement**: Invoice detail page shows "Mark as Statement" button for 0-item invoices; `POST /api/invoices/{id}/mark-statement`
+- **EFT Notification handling**: GFS EFT Notification PDFs parsed with 0 items should be marked as statements (not invoices)
 
 ### Vendor Item Name Normalization (Feb 2026)
 - `to_title_case()` in `utils/text_utils.py` — shared utility for smart food/restaurant title casing

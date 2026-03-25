@@ -204,6 +204,16 @@
                     </div>
                 </div>
 
+                <!-- Mode Toggle -->
+                <div class="mb-3 d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary active" id="singleModeBtn" onclick="setSplitMode(false)">
+                        <i class="bi bi-1-circle me-1"></i>Single Account
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="splitModeBtn" onclick="setSplitMode(true)">
+                        <i class="bi bi-diagram-3 me-1"></i>Split Across Accounts
+                    </button>
+                </div>
+
                 <!-- AI-Suggested GL Accounts -->
                 <div id="glSuggestionsSection" class="mb-3" style="display: none;">
                     <label class="form-label">
@@ -214,27 +224,48 @@
                     </div>
                 </div>
 
-                <!-- GL Account Selection with Search -->
-                <div class="mb-3">
-                    <label for="glAccountSearch" class="form-label">Select GL Account *</label>
-                    <input type="text"
-                           class="form-control"
-                           id="glAccountSearch"
-                           placeholder="Search accounts by number or name..."
-                           autocomplete="off">
-                    <input type="hidden" id="glAccountSelect" required>
-                    <div id="glAccountDropdown"
-                         class="dropdown-menu w-100"
-                         style="max-height: 300px; overflow-y: auto; display: none;">
-                        <!-- Account options will be dynamically inserted here -->
+                <!-- Single Account Mode -->
+                <div id="singleAccountSection">
+                    <!-- GL Account Selection with Search -->
+                    <div class="mb-3">
+                        <label for="glAccountSearch" class="form-label">Select GL Account *</label>
+                        <input type="text"
+                               class="form-control"
+                               id="glAccountSearch"
+                               placeholder="Search accounts by number or name..."
+                               autocomplete="off">
+                        <input type="hidden" id="glAccountSelect" required>
+                        <div id="glAccountDropdown"
+                             class="dropdown-menu w-100"
+                             style="max-height: 300px; overflow-y: auto; display: none;">
+                        </div>
+                        <small class="text-muted" id="selectedAccountDisplay"></small>
                     </div>
-                    <small class="text-muted" id="selectedAccountDisplay"></small>
+
+                    <!-- Description/Memo -->
+                    <div class="mb-3">
+                        <label for="glMemo" class="form-label">Memo/Notes</label>
+                        <textarea class="form-control" id="glMemo" rows="2" placeholder="Optional notes about this transaction"></textarea>
+                    </div>
                 </div>
 
-                <!-- Description/Memo -->
-                <div class="mb-3">
-                    <label for="glMemo" class="form-label">Memo/Notes</label>
-                    <textarea class="form-control" id="glMemo" rows="2" placeholder="Optional notes about this transaction"></textarea>
+                <!-- Split Account Mode -->
+                <div id="splitAccountSection" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label mb-0">Split Lines</label>
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="addSplitLine()">
+                            <i class="bi bi-plus-circle me-1"></i>Add Line
+                        </button>
+                    </div>
+                    <div id="splitLinesContainer">
+                        <!-- Split lines will be added dynamically -->
+                    </div>
+                    <div class="card bg-light mt-2">
+                        <div class="card-body py-2 d-flex justify-content-between">
+                            <span><strong>Transaction Total:</strong> <span id="splitTransactionTotal"></span></span>
+                            <span><strong>Remaining:</strong> <span id="splitRemaining" class="text-danger">$0.00</span></span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Note: Location/Area is automatically inherited from the bank account -->
@@ -335,6 +366,50 @@
     }
     .gl-set-account:hover {
         color: var(--primary) !important;
+    }
+    /* Split line rows */
+    .split-line-row {
+        display: flex;
+        gap: 8px;
+        align-items: start;
+        margin-bottom: 8px;
+        padding: 8px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+    }
+    .split-line-row .split-account-wrap {
+        flex: 1;
+        position: relative;
+    }
+    .split-line-row .split-amount {
+        width: 120px;
+    }
+    .split-line-row .split-memo {
+        width: 180px;
+    }
+    .split-line-row .split-remove {
+        width: 32px;
+        flex-shrink: 0;
+    }
+    .split-account-dropdown {
+        position: absolute;
+        z-index: 1050;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        width: 100%;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .split-account-dropdown .dropdown-item {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+        cursor: pointer;
+    }
+    .split-account-dropdown .dropdown-item:hover {
+        background-color: #e9ecef;
     }
 </style>
 
@@ -941,6 +1016,195 @@ function closeOpenBillsModal() {
     }
 }
 
+// ==================== Split GL Mode ====================
+let isSplitMode = false;
+let splitLineCounter = 0;
+let currentTransactionAmount = 0;
+
+function setSplitMode(enabled) {
+    isSplitMode = enabled;
+    document.getElementById('singleAccountSection').style.display = enabled ? 'none' : 'block';
+    document.getElementById('splitAccountSection').style.display = enabled ? 'block' : 'none';
+    document.getElementById('singleModeBtn').classList.toggle('active', !enabled);
+    document.getElementById('splitModeBtn').classList.toggle('active', enabled);
+
+    if (enabled) {
+        // Initialize with 2 empty lines
+        document.getElementById('splitLinesContainer').innerHTML = '';
+        splitLineCounter = 0;
+        document.getElementById('splitTransactionTotal').textContent = formatCurrency(currentTransactionAmount);
+        addSplitLine();
+        addSplitLine();
+        updateSplitRemaining();
+    }
+
+    // Update confirm button handler
+    const btn = document.getElementById('confirmGLBtn');
+    btn.onclick = enabled ? confirmSplitGLAssignment : confirmGLAssignment;
+    validateGLForm();
+}
+
+function addSplitLine() {
+    splitLineCounter++;
+    const lineId = splitLineCounter;
+    const container = document.getElementById('splitLinesContainer');
+
+    const row = document.createElement('div');
+    row.className = 'split-line-row';
+    row.id = `splitLine${lineId}`;
+    row.innerHTML = `
+        <div class="split-account-wrap">
+            <input type="text" class="form-control form-control-sm" id="splitAcctSearch${lineId}"
+                   placeholder="Search GL account..." autocomplete="off"
+                   onfocus="showSplitDropdown(${lineId})" oninput="filterSplitAccounts(${lineId})">
+            <input type="hidden" id="splitAcctId${lineId}">
+            <div class="split-account-dropdown" id="splitAcctDropdown${lineId}" style="display:none;"></div>
+            <small class="text-muted" id="splitAcctDisplay${lineId}"></small>
+        </div>
+        <div class="split-amount">
+            <input type="number" class="form-control form-control-sm" id="splitAmount${lineId}"
+                   placeholder="Amount" step="0.01" min="0" oninput="updateSplitRemaining()">
+        </div>
+        <div class="split-memo">
+            <input type="text" class="form-control form-control-sm" id="splitMemo${lineId}"
+                   placeholder="Memo (optional)">
+        </div>
+        <div class="split-remove">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeSplitLine(${lineId})" title="Remove line">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    `;
+    container.appendChild(row);
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function handler(e) {
+        const search = document.getElementById(`splitAcctSearch${lineId}`);
+        const dropdown = document.getElementById(`splitAcctDropdown${lineId}`);
+        if (search && dropdown && !search.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+}
+
+function removeSplitLine(lineId) {
+    const row = document.getElementById(`splitLine${lineId}`);
+    if (row) {
+        row.remove();
+        updateSplitRemaining();
+    }
+}
+
+function showSplitDropdown(lineId) {
+    filterSplitAccounts(lineId);
+    document.getElementById(`splitAcctDropdown${lineId}`).style.display = 'block';
+}
+
+function filterSplitAccounts(lineId) {
+    const search = document.getElementById(`splitAcctSearch${lineId}`).value.toLowerCase();
+    const dropdown = document.getElementById(`splitAcctDropdown${lineId}`);
+
+    const filtered = allGLAccounts.filter(a =>
+        a.account_number.toLowerCase().includes(search) ||
+        a.account_name.toLowerCase().includes(search)
+    ).slice(0, 15);
+
+    dropdown.innerHTML = filtered.map(a =>
+        `<div class="dropdown-item" onclick="selectSplitAccount(${lineId}, ${a.id}, '${a.account_number}', '${a.account_name.replace(/'/g, "\\'")}')">
+            <strong>${a.account_number}</strong> - ${a.account_name}
+        </div>`
+    ).join('');
+
+    dropdown.style.display = filtered.length ? 'block' : 'none';
+}
+
+function selectSplitAccount(lineId, accountId, accountNumber, accountName) {
+    document.getElementById(`splitAcctId${lineId}`).value = accountId;
+    document.getElementById(`splitAcctSearch${lineId}`).value = `${accountNumber} - ${accountName}`;
+    document.getElementById(`splitAcctDisplay${lineId}`).textContent = '';
+    document.getElementById(`splitAcctDropdown${lineId}`).style.display = 'none';
+    validateGLForm();
+}
+
+function updateSplitRemaining() {
+    const total = Math.abs(currentTransactionAmount);
+    let allocated = 0;
+    document.querySelectorAll('.split-line-row').forEach(row => {
+        const amountInput = row.querySelector('input[type="number"]');
+        if (amountInput && amountInput.value) {
+            allocated += parseFloat(amountInput.value) || 0;
+        }
+    });
+    const remaining = total - allocated;
+    const el = document.getElementById('splitRemaining');
+    el.textContent = formatCurrency(Math.abs(remaining));
+    el.className = Math.abs(remaining) < 0.01 ? 'text-success fw-bold' : 'text-danger';
+    validateGLForm();
+}
+
+function validateGLForm() {
+    const btn = document.getElementById('confirmGLBtn');
+    if (isSplitMode) {
+        const rows = document.querySelectorAll('.split-line-row');
+        if (rows.length < 2) { btn.disabled = true; return; }
+        let allValid = true;
+        let totalAllocated = 0;
+        rows.forEach(row => {
+            const acctId = row.querySelector('input[type="hidden"]').value;
+            const amount = parseFloat(row.querySelector('input[type="number"]').value) || 0;
+            if (!acctId || amount <= 0) allValid = false;
+            totalAllocated += amount;
+        });
+        const diff = Math.abs(totalAllocated - Math.abs(currentTransactionAmount));
+        btn.disabled = !allValid || diff > 0.01;
+    } else {
+        btn.disabled = !document.getElementById('glAccountSelect').value;
+    }
+}
+
+async function confirmSplitGLAssignment() {
+    const rows = document.querySelectorAll('.split-line-row');
+    const lines = [];
+    rows.forEach(row => {
+        const acctId = parseInt(row.querySelector('input[type="hidden"]').value);
+        const amount = parseFloat(row.querySelector('input[type="number"]').value);
+        const memoInput = row.querySelector('.split-memo input');
+        const memo = memoInput ? memoInput.value : '';
+        lines.push({ account_id: acctId, amount: amount, memo: memo || null });
+    });
+
+    const btn = document.getElementById('confirmGLBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing...';
+
+    try {
+        const response = await fetch(`/accounting/api/bank-statements/transactions/${currentTransactionId}/assign-gl-split?user_id=1`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                lines: lines,
+                suggested_account_id: currentSuggestedAccountId || null
+            })
+        });
+
+        if (response.ok) {
+            showToast(`Successfully split across ${lines.length} GL accounts`, 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('glAssignmentModal'));
+            if (modal) modal.hide();
+            refreshTransaction(currentTransactionId);
+        } else {
+            const error = await response.json();
+            showToast(`Error: ${error.detail || 'Failed to split GL assignment'}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error confirming split GL assignment:', error);
+        showToast('Error confirming split GL assignment', 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Confirm Assignment';
+    }
+}
+
 // Show GL assignment modal
 async function showGLAssignment(transactionId) {
     currentTransactionId = transactionId;
@@ -951,6 +1215,8 @@ async function showGLAssignment(transactionId) {
         showToast('Transaction not found', 'danger');
         return;
     }
+
+    currentTransactionAmount = transaction.amount;
 
     // Populate transaction details
     document.getElementById('glTransactionDate').textContent = formatDate(transaction.transaction_date);
@@ -963,6 +1229,9 @@ async function showGLAssignment(transactionId) {
     // Load AI suggestions
     await loadGLSuggestions(transactionId);
 
+    // Reset to single mode
+    setSplitMode(false);
+
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('glAssignmentModal'));
     modal.show();
@@ -971,7 +1240,7 @@ async function showGLAssignment(transactionId) {
     document.getElementById('glAccountSelect').value = '';
     document.getElementById('glAccountSearch').value = '';
     document.getElementById('selectedAccountDisplay').textContent = '';
-    document.getElementById('glMemo').value = transaction.description; // Pre-fill with transaction description
+    document.getElementById('glMemo').value = transaction.description;
     document.getElementById('confirmGLBtn').disabled = true;
 }
 

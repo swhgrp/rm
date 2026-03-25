@@ -3252,14 +3252,25 @@ async def approve_invoice_review(invoice_id: int, db: Session = Depends(get_db))
     invoice.needs_review = False
     invoice.review_reason = None
     invoice.approved_at = datetime.now(timezone.utc)
-    # Reset status from 'needs_review' to 'mapping' so update_invoice_status() will re-evaluate
-    invoice.status = 'mapping'
-    db.commit()
 
-    # Re-evaluate status (may transition to 'ready' or stay at 'mapping')
-    from integration_hub.services.invoice_status import update_invoice_status
-    new_status = update_invoice_status(invoice, db)
-    db.commit()
+    # Check if invoice has any line items
+    from integration_hub.services.invoice_status import get_total_items_count
+    total_items = get_total_items_count(invoice.id, db)
+
+    if total_items == 0:
+        # No items — this is a statement/notification, not a parseable invoice
+        invoice.status = 'statement'
+        db.commit()
+        new_status = 'statement'
+    else:
+        # Reset status from 'needs_review' to 'mapping' so update_invoice_status() will re-evaluate
+        invoice.status = 'mapping'
+        db.commit()
+
+        # Re-evaluate status (may transition to 'ready' or stay at 'mapping')
+        from integration_hub.services.invoice_status import update_invoice_status
+        new_status = update_invoice_status(invoice, db)
+        db.commit()
 
     logger.info(f"Invoice {invoice_id} review approved. Previous reasons: {old_reasons}. New status: {new_status}")
 

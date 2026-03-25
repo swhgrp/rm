@@ -458,6 +458,7 @@ class CSVInvoiceParser:
                 if i == 0:
                     # Check if a PDF-parsed invoice already exists for this invoice number
                     # If so, update that one and mark the CSV record as duplicate
+                    # CSV data is authoritative — replaces PDF regardless of status
                     inv_num_stripped = inv_data['invoice_number'].lstrip('0') or '0'
                     pdf_sibling = None
                     if inv_data.get('location_id'):
@@ -465,7 +466,7 @@ class CSVInvoiceParser:
                             HubInvoice.id != hub_invoice.id,
                             HubInvoice.location_id == inv_data['location_id'],
                             HubInvoice.source_filename.ilike('%.pdf'),
-                            HubInvoice.status.notin_(['sent', 'duplicate']),
+                            HubInvoice.status.notin_(['duplicate']),
                         ).all():
                             ps_num = (ps.invoice_number or '').lstrip('0') or '0'
                             if ps_num == inv_num_stripped:
@@ -482,31 +483,40 @@ class CSVInvoiceParser:
                         invoice = hub_invoice
                 else:
                     # Check if invoice with same number + location already exists
-                    existing = self.db.query(HubInvoice).filter(
+                    # Also try leading-zero-stripped match for PDF-parsed invoices
+                    inv_num_stripped = inv_data['invoice_number'].lstrip('0') or '0'
+                    existing = None
+
+                    # First: exact match on invoice number + location
+                    exact = self.db.query(HubInvoice).filter(
                         HubInvoice.invoice_number == inv_data['invoice_number'],
                         HubInvoice.location_id == inv_data['location_id'],
-                        HubInvoice.id != hub_invoice.id
+                        HubInvoice.id != hub_invoice.id,
+                        HubInvoice.status != 'duplicate'
                     ).first()
 
-                    if existing:
-                        # Update existing invoice instead of creating duplicate
-                        invoice = existing
-                        logger.info(f"Found existing invoice {existing.id} for "
-                                   f"{inv_data['invoice_number']} at location {inv_data['location_id']}")
+                    if exact:
+                        existing = exact
                     else:
-                        # Also check for PDF-parsed invoice with same number (without leading zeros)
-                        inv_num_stripped = inv_data['invoice_number'].lstrip('0') or '0'
-                        pdf_sibling = self.db.query(HubInvoice).filter(
+                        # Stripped-zero match across all sources
+                        candidates = self.db.query(HubInvoice).filter(
                             HubInvoice.id != hub_invoice.id,
                             HubInvoice.location_id == inv_data['location_id'],
-                            HubInvoice.source_filename.ilike('%.pdf'),
+                            HubInvoice.status.notin_(['duplicate']),
                         ).all()
-                        pdf_match = None
-                        for ps in pdf_sibling:
+                        for ps in candidates:
                             ps_num = (ps.invoice_number or '').lstrip('0') or '0'
                             if ps_num == inv_num_stripped:
-                                pdf_match = ps
+                                existing = ps
                                 break
+
+                    if existing:
+                        # Update existing invoice — CSV data replaces PDF
+                        invoice = existing
+                        logger.info(f"Found existing invoice {existing.id} (#{existing.invoice_number}) for "
+                                   f"{inv_data['invoice_number']} at location {inv_data['location_id']} — replacing with CSV data")
+                    else:
+                        pdf_match = None  # No match found
                         if pdf_match:
                             # Replace PDF-parsed invoice with CSV data
                             invoice = pdf_match
@@ -528,6 +538,19 @@ class CSVInvoiceParser:
                             )
                             self.db.add(invoice)
 
+                # If replacing a previously sent invoice, reset sync status
+                was_sent = invoice.status == 'sent'
+                if was_sent:
+                    logger.info(f"Invoice {invoice.id} was previously sent — resetting sync for CSV replacement")
+                    invoice.inventory_sent = False
+                    invoice.accounting_sent = False
+                    invoice.inventory_error = None
+                    invoice.accounting_error = None
+
+                # Clear review flags
+                invoice.needs_review = False
+                invoice.review_reason = None
+
                 # Update invoice fields
                 invoice.vendor_name = inv_data['vendor_name']
                 invoice.invoice_number = inv_data['invoice_number']
@@ -538,6 +561,7 @@ class CSVInvoiceParser:
                 invoice.location_name = inv_data['location_name']
                 invoice.status = 'mapping'  # Ready for item mapping
                 invoice.parse_error = None
+                invoice.source = 'csv'  # Mark source as CSV
 
                 # Match vendor name to existing vendor record
                 if not invoice.vendor_id and inv_data['vendor_name']:

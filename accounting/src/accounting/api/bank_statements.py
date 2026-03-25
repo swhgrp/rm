@@ -45,7 +45,8 @@ from accounting.schemas.bank_statement import (
     MatchBillsRequest,
     MatchBillsResponse,
     GLAssignmentRequest,
-    GLAssignmentResponse
+    GLAssignmentResponse,
+    GLSplitAssignmentRequest
 )
 from accounting.services.bank_matching import BankMatchingService
 from accounting.utils.vendor_recognition import VendorRecognitionService
@@ -1140,6 +1141,204 @@ def assign_transaction_to_gl(
         account_id=gl_request.account_id,
         status='confirmed',
         message=f"Successfully assigned to {gl_account.account_number} - {gl_account.account_name}"
+    )
+
+
+@router.post("/transactions/{transaction_id}/assign-gl-split", response_model=GLAssignmentResponse)
+def assign_transaction_to_gl_split(
+    transaction_id: int,
+    split_request: GLSplitAssignmentRequest,
+    user_id: int = Query(..., description="User ID performing the assignment"),
+    db: Session = Depends(get_db)
+):
+    """
+    Split a bank transaction across multiple GL accounts.
+    Each line specifies an account and amount. Amounts must sum to the transaction total.
+    """
+    from datetime import datetime
+
+    # Get transaction
+    transaction = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).first()
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    if transaction.status == 'reconciled':
+        raise HTTPException(status_code=400, detail="Transaction already reconciled")
+
+    if len(split_request.lines) < 2:
+        raise HTTPException(status_code=400, detail="Split requires at least 2 lines")
+
+    # Get bank account
+    bank_account = db.query(BankAccount).filter(BankAccount.id == transaction.bank_account_id).first()
+    if not bank_account:
+        raise HTTPException(status_code=404, detail="Bank account not found")
+
+    if not bank_account.gl_account_id:
+        raise HTTPException(status_code=400, detail="Bank account has no linked GL account")
+
+    # Validate split amounts sum to transaction total
+    transaction_amount_abs = abs(float(transaction.amount))
+    split_total = sum(float(line.amount) for line in split_request.lines)
+    if abs(split_total - transaction_amount_abs) > 0.01:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Split amounts ({split_total:.2f}) must equal transaction amount ({transaction_amount_abs:.2f})"
+        )
+
+    # Validate all GL accounts exist
+    for line in split_request.lines:
+        acct = db.query(Account).filter(Account.id == line.account_id).first()
+        if not acct:
+            raise HTTPException(status_code=404, detail=f"GL account {line.account_id} not found")
+
+    is_expense = float(transaction.amount) < 0
+    area_id = bank_account.area_id
+
+    # Generate unique entry number
+    max_bank_entry = db.query(JournalEntry.entry_number).filter(
+        JournalEntry.entry_number.like('JE-BANK-%'),
+        ~JournalEntry.entry_number.like('JE-BANK-ADJ-%')
+    ).order_by(JournalEntry.entry_number.desc()).first()
+
+    if max_bank_entry:
+        try:
+            last_num = int(max_bank_entry[0].split('-')[-1])
+            next_num = last_num + 1
+        except (ValueError, IndexError):
+            next_num = 1
+    else:
+        next_num = 1
+
+    # Create journal entry
+    first_memo = split_request.lines[0].memo or transaction.description
+    je = JournalEntry(
+        entry_date=transaction.transaction_date,
+        entry_number=f"JE-BANK-{next_num:06d}",
+        description=f"Bank Rec (Split) - {first_memo[:80]}",
+        reference_type='bank_transaction',
+        reference_id=transaction.id,
+        status='POSTED',
+        created_by=user_id,
+        approved_by=user_id,
+        posted_at=datetime.now()
+    )
+    db.add(je)
+    db.flush()
+
+    # Create journal entry lines
+    line_number = 1
+    first_gl_line = None
+
+    if is_expense:
+        # Money OUT: DR each GL account, CR Bank for total
+        for split_line in split_request.lines:
+            memo = split_line.memo or transaction.description
+            gl_line = JournalEntryLine(
+                journal_entry_id=je.id,
+                line_number=line_number,
+                account_id=split_line.account_id,
+                debit_amount=float(split_line.amount),
+                credit_amount=0,
+                description=memo,
+                area_id=area_id
+            )
+            db.add(gl_line)
+            if not first_gl_line:
+                first_gl_line = gl_line
+            line_number += 1
+
+        # Bank credit line (total)
+        bank_line = JournalEntryLine(
+            journal_entry_id=je.id,
+            line_number=line_number,
+            account_id=bank_account.gl_account_id,
+            debit_amount=0,
+            credit_amount=transaction_amount_abs,
+            description=f"Bank: {transaction.description[:100]}",
+            area_id=area_id
+        )
+        db.add(bank_line)
+    else:
+        # Money IN: DR Bank for total, CR each GL account
+        bank_line = JournalEntryLine(
+            journal_entry_id=je.id,
+            line_number=line_number,
+            account_id=bank_account.gl_account_id,
+            debit_amount=transaction_amount_abs,
+            credit_amount=0,
+            description=f"Bank: {transaction.description[:100]}",
+            area_id=area_id
+        )
+        db.add(bank_line)
+        line_number += 1
+
+        for split_line in split_request.lines:
+            memo = split_line.memo or transaction.description
+            gl_line = JournalEntryLine(
+                journal_entry_id=je.id,
+                line_number=line_number,
+                account_id=split_line.account_id,
+                debit_amount=0,
+                credit_amount=float(split_line.amount),
+                description=memo,
+                area_id=area_id
+            )
+            db.add(gl_line)
+            if not first_gl_line:
+                first_gl_line = gl_line
+            line_number += 1
+
+    # Update transaction status
+    transaction.status = 'reconciled'
+    transaction.matched_journal_line_id = first_gl_line.id if first_gl_line else bank_line.id
+    transaction.suggested_account_id = split_request.lines[0].account_id
+
+    # Create match record
+    match_record = BankTransactionMatch(
+        bank_transaction_id=transaction.id,
+        match_type='gl_account',
+        confidence_score=100.0,
+        match_reason=f"Split across {len(split_request.lines)} GL accounts",
+        amount_difference=0,
+        confirmed_by=user_id,
+        confirmed_at=func.current_timestamp(),
+        clearing_journal_entry_id=je.id,
+        status='confirmed'
+    )
+    db.add(match_record)
+
+    db.commit()
+
+    # Learn from first line (primary account)
+    try:
+        from accounting.services.gl_learning_service import GLLearningService
+        from accounting.utils.vendor_recognition import VendorRecognitionService
+
+        vendor_id = None
+        if transaction.description:
+            vendor_service = VendorRecognitionService(db)
+            extracted_name, vendor, confidence = vendor_service.recognize_vendor(transaction.description)
+            if vendor:
+                vendor_id = vendor.id
+
+        learning_service = GLLearningService(db)
+        learning_service.learn_from_assignment(
+            description=transaction.description or '',
+            account_id=split_request.lines[0].account_id,
+            vendor_id=vendor_id,
+            suggested_account_id=split_request.suggested_account_id,
+            amount=transaction.amount,
+            transaction_date=transaction.transaction_date
+        )
+    except Exception as e:
+        logger.warning(f"Failed to record GL learning: {e}")
+
+    return GLAssignmentResponse(
+        bank_transaction_id=transaction.id,
+        journal_entry_id=je.id,
+        account_id=split_request.lines[0].account_id,
+        status='confirmed',
+        message=f"Successfully split across {len(split_request.lines)} GL accounts"
     )
 
 

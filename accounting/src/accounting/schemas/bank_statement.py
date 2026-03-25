@@ -287,6 +287,19 @@ class GLAssignmentRequest(BaseModel):
     suggested_account_id: Optional[int] = None  # What the system suggested, for learning feedback
 
 
+class GLSplitLine(BaseModel):
+    """Single line in a split GL assignment"""
+    account_id: int
+    amount: Decimal
+    memo: Optional[str] = None
+
+
+class GLSplitAssignmentRequest(BaseModel):
+    """Request to split a bank transaction across multiple GL accounts"""
+    lines: list[GLSplitLine]
+    suggested_account_id: Optional[int] = None
+
+
 class GLAssignmentResponse(BaseModel):
     """Response after GL assignment"""
     bank_transaction_id: int
