@@ -293,41 +293,16 @@ class AccountingSenderService:
 
         logger.debug(f"Built vendor bill payload with {len(payload['lines'])} lines, total: ${total_amount}")
 
-        # Validate total matches invoice total
+        # Validate total matches invoice total — reject if they don't balance
+        # Line items must account for every dollar so GL categorization is accurate
         invoice_total = Decimal(str(invoice.total_amount))
-        difference = total_amount - invoice_total
+        difference = abs(total_amount - invoice_total)
 
-        # If there's a discrepancy, add an adjustment line to balance
-        if abs(difference) > Decimal('0.01'):
-            # Adjustment needed: negative if lines > invoice, positive if lines < invoice
-            adjustment_amount = invoice_total - total_amount
-
-            if difference > 0:
-                logger.info(f"Lines exceed invoice by ${difference} - adding credit/discount adjustment of ${adjustment_amount}")
-                adjustment_desc = "Credit / Discount Adjustment"
-            else:
-                logger.info(f"Lines under invoice by ${-difference} - adding minimum charge adjustment of ${adjustment_amount}")
-                adjustment_desc = "Minimum Charge / Adjustment"
-
-            # Use the most common GL account from the existing lines
-            if account_number_totals:
-                # Find the account with the highest total (most likely the primary expense account)
-                primary_account = max(account_number_totals.keys(),
-                                     key=lambda k: abs(account_number_totals[k]["amount"]))
-                try:
-                    adjustment_account_id = self._get_account_id(primary_account)
-                except ValueError:
-                    # Fallback: use the first account from the lines
-                    adjustment_account_id = payload["lines"][0]["account_id"] if payload["lines"] else None
-
-                if adjustment_account_id:
-                    payload["lines"].append({
-                        "account_id": adjustment_account_id,
-                        "amount": float(adjustment_amount),
-                        "description": adjustment_desc
-                    })
-                    total_amount += adjustment_amount
-                    logger.info(f"Added adjustment line: ${adjustment_amount} to account {primary_account}")
+        if difference > Decimal('0.10'):
+            raise ValueError(
+                f"Line items total ${total_amount} does not match invoice total ${invoice_total} "
+                f"(diff ${difference}). Invoice needs review — missing line items or fees."
+            )
 
         return payload
 

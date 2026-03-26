@@ -759,7 +759,7 @@ class AutoMapperService:
                     SELECT id, gl_cogs_account, gl_asset_account, gl_waste_account,
                            inventory_category, item_description, item_code
                     FROM invoice_item_mapping_deprecated
-                    WHERE item_code = :code
+                    WHERE TRIM(item_code) = TRIM(:code)
                     AND is_active = true
                     AND inventory_item_id IS NULL
                     LIMIT 1
@@ -787,7 +787,7 @@ class AutoMapperService:
                     SELECT id, gl_cogs_account, gl_asset_account, gl_waste_account,
                            inventory_category, item_description, item_code
                     FROM invoice_item_mapping_deprecated
-                    WHERE LOWER(item_description) = LOWER(:desc)
+                    WHERE LOWER(TRIM(item_description)) = LOWER(TRIM(:desc))
                     AND is_active = true
                     AND inventory_item_id IS NULL
                     LIMIT 1

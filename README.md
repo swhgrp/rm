@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** March 25, 2026
+**Last Updated:** March 26, 2026
 **Status:** ~98% Complete - All 11 Systems Production Ready ✅
-**Latest:** Fintech duplicate detection, CSV viewer filtering, third-party payment deposits, CSV-over-PDF replacement improvements (Mar 25, 2026) ✅
+**Latest:** Daily automated accounting review with email reports, vendor bill validation defense-in-depth (Mar 26, 2026) ✅
 
 ---
 
@@ -593,12 +593,20 @@ restaurant-system/
 - ✅ **Third-party payment deposits** — DoorDash, UberEats, etc. included in card_deposit calculation (not just CARD payments)
 - ✅ **Inactive vendor reactivation** — VendorService reuses inactive vendors with matching name instead of creating duplicates
 
-**GL Review & Anomaly Detection (NEW Mar 2026):** 🌟
+**GL Review & Anomaly Detection (Mar 2026):** 🌟
 - ✅ **Automated nightly GL sweep** — rules engine + Claude AI anomaly detection
 - ✅ **Statistical baselines** — monthly recompute per GL account
 - ✅ **Flag lifecycle** — open → reviewed → dismissed → superseded with 90-day retention
 - ✅ **AI reasoning** — Claude Sonnet analyzes flagged entries for severity and explanation
 - ✅ **GL Review UI** — dedicated page for reviewing and acting on anomaly flags
+
+**Daily Automated Accounting Review (NEW Mar 2026):** 🔥
+- ✅ **Cross-system daily audit** — scans Accounting, Hub, and Inventory DBs at 5 AM daily
+- ✅ **10 check categories** — invoice accuracy, GL integrity, sync reconciliation, pipeline health, beverage pricing, linen parse quality, delivery fees, duplicate detection
+- ✅ **Email report** — HTML summary with critical/warning/info findings emailed to admin
+- ✅ **4-layer vendor bill validation** — post-parse validator → Hub sender reject → Accounting receiver reject → JE balance check
+- ✅ **Finding persistence** — all findings stored in `daily_review_runs` / `daily_review_findings` tables
+- ✅ **Review spec** — `REVIEW_SPEC.md` defines all checks, correction rules, and report format
 
 **Other:**
 - ✅ COGS tracking

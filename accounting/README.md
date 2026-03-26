@@ -4,11 +4,32 @@
 
 The Accounting System is a comprehensive double-entry accounting platform providing complete financial management including chart of accounts, journal entries, accounts payable/receivable, banking, and sophisticated financial reporting. This is the **most complex system** in the restaurant management platform with 157 Python files.
 
-## Status: 95% Production Ready ✅
+## Status: 97% Production Ready ✅
 
-**Last Updated:** January 15, 2026
+**Last Updated:** March 26, 2026
 
 ## Recent Updates
+
+### March 26, 2026 - Daily Automated Accounting Review 🔥
+
+**Daily Review System:**
+- ✅ **Cross-system audit** — scans Accounting, Hub, and Inventory databases daily at 5 AM
+- ✅ **10 check categories** — invoice accuracy, GL integrity, inventory costs, duplicate detection, Hub↔Accounting sync, pipeline health, beverage pricing, linen parse quality, delivery fee completeness
+- ✅ **Email report** — HTML summary with critical/warning/info findings emailed to admin@swhgrp.com
+- ✅ **Finding persistence** — `daily_review_runs` and `daily_review_findings` tables track all findings
+- ✅ **Review spec** — `REVIEW_SPEC.md` defines all checks, auto-correction rules, duplicate resolution, and report format
+- ✅ **Thread-safe** — runs in `asyncio.to_thread()` to avoid blocking the web server
+
+**Vendor Bill Validation (4-layer defense-in-depth):**
+- ✅ **Layer 1**: Post-parse validator catches total mismatches in Hub
+- ✅ **Layer 2**: Hub sender rejects bills where lines don't sum to total (>$0.10)
+- ✅ **Layer 3**: Accounting receiver rejects mismatched payloads
+- ✅ **Layer 4**: JE balance check prevents unbalanced journal entries
+
+**GL Sweep Fix:**
+- ✅ **Thread pool execution** — nightly GL sweep and monthly baseline rebuild now run via `asyncio.to_thread()` to prevent blocking the async event loop
+
+---
 
 ### January 15, 2026 - Dashboard Reorganization & GL Enhancements 📊
 

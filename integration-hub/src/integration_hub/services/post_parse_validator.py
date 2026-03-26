@@ -22,8 +22,7 @@ logger = logging.getLogger(__name__)
 MAX_REASONABLE_UNIT_PRICE = 500.0   # Flag unit prices above this
 MAX_REASONABLE_QUANTITY = 999.0     # Flag quantities above this
 SKU_AS_PRICE_THRESHOLD = 10000     # Integer price ≥ this with no decimal = likely SKU
-TOTAL_MISMATCH_PCT_THRESHOLD = 5.0  # Flag if line items vs invoice total differs by > 5%
-TOTAL_MISMATCH_ABS_THRESHOLD = 5.0  # AND differs by > $5 (avoids noise on small invoices)
+TOTAL_MISMATCH_ABS_THRESHOLD = 0.10  # Flag if line items vs invoice total differs by > $0.10 (rounding tolerance)
 MIN_VENDOR_CATALOG_SIZE = 10       # Skip catalog check if vendor has fewer known items
 DESC_MISMATCH_THRESHOLD = 0.3     # Jaccard similarity below this = description mismatch
 
@@ -188,11 +187,9 @@ def validate_invoice_totals(invoice_id: int, db: Session) -> Dict:
         mismatch_abs = abs(line_items_total - invoice_total)
         mismatch_pct = 0.0
 
-    # Flag if both percentage AND absolute thresholds exceeded
-    needs_flag = (
-        mismatch_pct > TOTAL_MISMATCH_PCT_THRESHOLD
-        and mismatch_abs > TOTAL_MISMATCH_ABS_THRESHOLD
-    )
+    # Flag any mismatch beyond rounding tolerance — invoices must balance exactly
+    # for proper GL categorization (missing fees/charges get dumped to wrong accounts)
+    needs_flag = mismatch_abs > TOTAL_MISMATCH_ABS_THRESHOLD
 
     if needs_flag:
         logger.warning(

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from accounting.db.database import SessionLocal
 from accounting.models.pos import POSConfiguration
 from accounting.services.pos_sync_service import POSSyncService
+from accounting.services.daily_review import daily_review_task
 
 logger = logging.getLogger(__name__)
 
@@ -267,8 +268,15 @@ async def catchup_missed_syncs():
 async def nightly_gl_sweep():
     """
     Nightly GL anomaly detection sweep.
-    Runs rules engine + AI analysis for each active area, covering the last 7 days.
+    Runs in a thread pool to avoid blocking the async event loop (the AI analyzer
+    and SQLAlchemy calls are synchronous).
     """
+    import asyncio
+    await asyncio.to_thread(_nightly_gl_sweep_sync)
+
+
+def _nightly_gl_sweep_sync():
+    """Synchronous GL sweep implementation — runs in thread pool."""
     from accounting.models.area import Area
     from accounting.gl_review.models import GLAnomalyFlag, STATUS_OPEN, STATUS_SUPERSEDED, STATUS_DISMISSED, STATUS_REVIEWED
     from accounting.gl_review.rules_engine import run_rules_engine
@@ -352,8 +360,14 @@ async def nightly_gl_sweep():
 async def monthly_baseline_rebuild():
     """
     Monthly GL account baseline rebuild.
-    Recomputes statistical baselines for all active areas using 12 months of history.
+    Runs in a thread pool to avoid blocking the async event loop.
     """
+    import asyncio
+    await asyncio.to_thread(_monthly_baseline_rebuild_sync)
+
+
+def _monthly_baseline_rebuild_sync():
+    """Synchronous baseline rebuild — runs in thread pool."""
     from accounting.models.area import Area
     from accounting.gl_review.baselines import compute_baselines
 
@@ -434,12 +448,22 @@ def start_scheduler():
             max_instances=1
         )
 
+        # Add daily accounting review - runs at 5 AM daily
+        scheduler.add_job(
+            daily_review_task,
+            trigger=CronTrigger(hour=5, minute=0),
+            id='daily_accounting_review',
+            name='Daily automated accounting review',
+            replace_existing=True,
+            max_instances=1
+        )
+
         # Start the scheduler
         scheduler.start()
         logger.info("Background scheduler started successfully")
         logger.info("Auto-sync task will check every 10 minutes for locations due for sync")
         logger.info("Startup catchup task will run immediately to sync any missed days")
-        logger.info("GL sweep scheduled daily at 3:00 AM, baseline rebuild monthly at 4:00 AM on 1st")
+        logger.info("GL sweep daily at 3:00 AM, daily review at 5:00 AM, baseline rebuild monthly at 4:00 AM on 1st")
         logger.info(f"Scheduler jobs: {scheduler.get_jobs()}")
 
     except Exception as e:

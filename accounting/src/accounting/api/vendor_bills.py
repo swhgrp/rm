@@ -139,6 +139,20 @@ def create_bill_journal_entry(bill: VendorBill, db: Session) -> JournalEntry:
     )
     db.add(je_line)
 
+    # Safety check: verify JE balances (DR == CR) before returning
+    total_debits = sum(
+        bl.amount + bl.tax_amount for bl in bill.line_items if (bl.amount + bl.tax_amount) >= 0
+    )
+    total_credits_from_lines = sum(
+        abs(bl.amount + bl.tax_amount) for bl in bill.line_items if (bl.amount + bl.tax_amount) < 0
+    )
+    net_debit = total_debits - total_credits_from_lines
+    if abs(net_debit - bill.total_amount) > Decimal('0.10'):
+        raise ValueError(
+            f"Journal entry would not balance: expense lines net ${net_debit} vs AP credit ${bill.total_amount}. "
+            f"Bill {bill.bill_number} rejected."
+        )
+
     return je
 
 
@@ -933,6 +947,17 @@ def receive_vendor_bill_from_hub(
 
         db.add(bill)
         db.flush()  # Get bill ID
+
+        # Validate line items sum matches total before creating anything
+        lines_total = sum(Decimal(str(line_data["amount"])) for line_data in bill_data["lines"])
+        bill_total = Decimal(str(bill_data["total_amount"]))
+        line_diff = abs(lines_total - bill_total)
+        if line_diff > Decimal('0.10'):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Line items total ${lines_total} does not match bill total ${bill_total} "
+                       f"(diff ${line_diff}). Bill rejected — Hub must fix line items before sending."
+            )
 
         # Create line items
         for idx, line_data in enumerate(bill_data["lines"], start=1):

@@ -526,10 +526,18 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <!-- Search Type Toggle -->
+                <div class="btn-group w-100 mb-3" role="group" id="searchTypeToggle">
+                    <input type="radio" class="btn-check" name="searchType" id="searchTypeVendor" value="vendor" checked>
+                    <label class="btn btn-outline-primary" for="searchTypeVendor">Vendor Items</label>
+                    <input type="radio" class="btn-check" name="searchType" id="searchTypeExpense" value="expense">
+                    <label class="btn btn-outline-primary" for="searchTypeExpense">Expense Items</label>
+                </div>
+
                 <!-- Search Mode (default) -->
                 <div id="addItemSearchMode">
                     <div class="mb-3">
-                        <label class="form-label">Search Vendor Items</label>
+                        <label class="form-label" id="searchLabel">Search Vendor Items</label>
                         <input type="text" class="form-control" id="vendorItemSearch" placeholder="Search by name or SKU..." oninput="debouncedVendorSearch()">
                         <div id="vendorSearchSpinner" class="text-center py-2" style="display:none;">
                             <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -670,6 +678,8 @@ function showEditModal() {
 let vendorSearchTimeout = null;
 let vendorSearchResults = [];
 let addItemManualMode = false;
+let searchType = 'vendor';
+let selectedExpenseGL = null;  // Store GL accounts when expense item is selected
 
 function showAddItemModal() {
     // Reset all fields
@@ -688,6 +698,13 @@ function showAddItemModal() {
     document.getElementById('selectedVendorItem').style.display = 'none';
     document.getElementById('vendorItemSearch').style.display = '';
     vendorSearchResults = [];
+    selectedExpenseGL = null;
+
+    // Reset search type to vendor
+    document.getElementById('searchTypeVendor').checked = true;
+    searchType = 'vendor';
+    document.getElementById('searchLabel').textContent = 'Search Vendor Items';
+    document.getElementById('vendorItemSearch').placeholder = 'Search by name or SKU...';
 
     // Default to search mode
     toggleManualEntry(false);
@@ -695,6 +712,26 @@ function showAddItemModal() {
     const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
     modal.show();
 }
+
+// Search type toggle handler
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input[name="searchType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            searchType = this.value;
+            clearSelectedVendorItem();
+            document.getElementById('vendorItemSearch').value = '';
+            document.getElementById('vendorSearchResults').style.display = 'none';
+            if (searchType === 'expense') {
+                document.getElementById('searchLabel').textContent = 'Search Expense Items';
+                document.getElementById('vendorItemSearch').placeholder = 'Search expense items by name...';
+            } else {
+                document.getElementById('searchLabel').textContent = 'Search Vendor Items';
+                document.getElementById('vendorItemSearch').placeholder = 'Search by name or SKU...';
+            }
+            document.getElementById('vendorItemSearch').focus();
+        });
+    });
+});
 
 function debouncedVendorSearch() {
     if (vendorSearchTimeout) clearTimeout(vendorSearchTimeout);
@@ -714,9 +751,14 @@ async function searchVendorItems() {
     spinner.style.display = '';
 
     try {
-        const vendorId = {{ invoice.vendor_id or 'null' }};
-        let url = `/hub/api/v1/vendor-items/?search=${encodeURIComponent(query)}&page_size=20&status=active`;
-        if (vendorId) url += `&vendor_id=${vendorId}`;
+        let url;
+        if (searchType === 'expense') {
+            url = `/hub/api/expense-items/search?search=${encodeURIComponent(query)}`;
+        } else {
+            const vendorId = {{ invoice.vendor_id or 'null' }};
+            url = `/hub/api/v1/vendor-items/?search=${encodeURIComponent(query)}&page_size=20&status=active`;
+            if (vendorId) url += `&vendor_id=${vendorId}`;
+        }
 
         const response = await fetch(url);
         const data = await response.json();
@@ -731,19 +773,35 @@ async function searchVendorItems() {
             return;
         }
 
-        resultsDiv.innerHTML = vendorSearchResults.map((item, idx) => {
-            const name = (item.vendor_product_name || '').replace(/</g, '&lt;');
-            const sku = (item.vendor_sku || '').replace(/</g, '&lt;');
-            const cat = (item.category || '').replace(/</g, '&lt;');
-            const uom = (item.purchase_unit_abbr || '').toUpperCase();
-            return `<div class="d-flex justify-content-between align-items-center p-2 border-bottom" style="cursor:pointer;" onclick="selectVendorItem(${idx})">
-                <div>
-                    <strong>${name}</strong><br>
-                    <small class="text-muted">${sku ? 'SKU: ' + sku + ' &middot; ' : ''}${cat}${uom ? ' &middot; ' + uom : ''}</small>
-                </div>
-                <i class="bi bi-plus-circle text-primary"></i>
-            </div>`;
-        }).join('');
+        if (searchType === 'expense') {
+            resultsDiv.innerHTML = vendorSearchResults.map((item, idx) => {
+                const name = (item.item_description || '').replace(/</g, '&lt;');
+                const code = (item.item_code || '').replace(/</g, '&lt;');
+                const cat = (item.category || '').replace(/</g, '&lt;');
+                const vendor = (item.vendor_name || '').replace(/</g, '&lt;');
+                return `<div class="d-flex justify-content-between align-items-center p-2 border-bottom" style="cursor:pointer;" onclick="selectExpenseItem(${idx})">
+                    <div>
+                        <strong>${name}</strong><br>
+                        <small class="text-muted">${code ? code + ' &middot; ' : ''}${cat}${vendor ? ' &middot; ' + vendor : ''}</small>
+                    </div>
+                    <i class="bi bi-plus-circle text-warning"></i>
+                </div>`;
+            }).join('');
+        } else {
+            resultsDiv.innerHTML = vendorSearchResults.map((item, idx) => {
+                const name = (item.vendor_product_name || '').replace(/</g, '&lt;');
+                const sku = (item.vendor_sku || '').replace(/</g, '&lt;');
+                const cat = (item.category || '').replace(/</g, '&lt;');
+                const uom = (item.purchase_unit_abbr || '').toUpperCase();
+                return `<div class="d-flex justify-content-between align-items-center p-2 border-bottom" style="cursor:pointer;" onclick="selectVendorItem(${idx})">
+                    <div>
+                        <strong>${name}</strong><br>
+                        <small class="text-muted">${sku ? 'SKU: ' + sku + ' &middot; ' : ''}${cat}${uom ? ' &middot; ' + uom : ''}</small>
+                    </div>
+                    <i class="bi bi-plus-circle text-primary"></i>
+                </div>`;
+            }).join('');
+        }
         resultsDiv.style.display = '';
     } catch (error) {
         spinner.style.display = 'none';
@@ -778,8 +836,39 @@ function selectVendorItem(idx) {
     document.getElementById('add_item_qty').focus();
 }
 
+function selectExpenseItem(idx) {
+    const item = vendorSearchResults[idx];
+    if (!item) return;
+
+    // Fill hidden form fields
+    document.getElementById('add_item_description').value = item.item_description || '';
+    document.getElementById('add_item_code').value = item.item_code || '';
+    document.getElementById('add_item_uom').value = '';
+
+    // Store GL accounts for submission
+    selectedExpenseGL = {
+        gl_asset_account: item.gl_asset_account,
+        gl_cogs_account: item.gl_cogs_account,
+    };
+
+    // Show selected item, hide search
+    const cat = item.category || 'Expense';
+    document.getElementById('selectedItemName').textContent = item.item_description || '';
+    document.getElementById('selectedItemDetails').textContent =
+        (item.item_code ? item.item_code + ' \u00b7 ' : '') + cat +
+        (item.vendor_name ? ' \u00b7 ' + item.vendor_name : '');
+    document.getElementById('selectedVendorItem').style.display = '';
+    document.getElementById('selectedVendorItem').className = 'alert alert-warning py-2 mb-3';
+    document.getElementById('vendorSearchResults').style.display = 'none';
+    document.getElementById('vendorItemSearch').style.display = 'none';
+    document.getElementById('vendorSearchSpinner').style.display = 'none';
+
+    document.getElementById('add_item_qty').focus();
+}
+
 function clearSelectedVendorItem() {
     document.getElementById('selectedVendorItem').style.display = 'none';
+    document.getElementById('selectedVendorItem').className = 'alert alert-success py-2 mb-3';
     document.getElementById('vendorItemSearch').style.display = '';
     document.getElementById('vendorItemSearch').value = '';
     document.getElementById('vendorSearchResults').style.display = 'none';
@@ -787,6 +876,7 @@ function clearSelectedVendorItem() {
     document.getElementById('add_item_code').value = '';
     document.getElementById('add_item_uom').value = '';
     document.getElementById('add_item_pack_size').value = '';
+    selectedExpenseGL = null;
     document.getElementById('vendorItemSearch').focus();
 }
 
@@ -836,6 +926,12 @@ async function addItem() {
         unit_price: parseFloat(document.getElementById('add_item_price').value) || 0,
         pack_size: parseInt(document.getElementById('add_item_pack_size').value) || null
     };
+
+    // Include GL accounts if an expense item was selected
+    if (selectedExpenseGL) {
+        if (selectedExpenseGL.gl_asset_account) data.gl_asset_account = selectedExpenseGL.gl_asset_account;
+        if (selectedExpenseGL.gl_cogs_account) data.gl_cogs_account = selectedExpenseGL.gl_cogs_account;
+    }
 
     try {
         const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/items`, {

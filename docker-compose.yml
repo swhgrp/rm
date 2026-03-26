@@ -104,6 +104,8 @@ services:
     - PLAID_ENV=production
     - ANTHROPIC_API_KEY=${ACCOUNTING_ANTHROPIC_API_KEY}
     - GL_REVIEW_AI_MODEL=claude-sonnet-4-6
+    - HUB_DATABASE_URL=postgresql://hub_user:hub_password@hub-db:5432/integration_hub_db
+    - INVENTORY_DATABASE_URL=postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db
     depends_on:
       accounting-db:
         condition: service_healthy

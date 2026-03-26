@@ -5,7 +5,7 @@ Microservices-based restaurant management platform for SW Hospitality Group.
 - **Production URL:** https://rm.swhgrp.com
 - **Architecture:** 11 FastAPI microservices behind Nginx reverse proxy, each with its own PostgreSQL database
 - **Portal:** Central auth + UI at `/portal/`, serves templates from each service's template directory
-- **Last Updated:** March 25, 2026
+- **Last Updated:** March 26, 2026
 
 ## Infrastructure & Development Environment
 - **Production Server:** Linode Ubuntu instance at `/opt/restaurant-system/`
@@ -190,6 +190,27 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - **Financial integration**: Equipment prices included in subtotal calculation alongside food items; service charge and tax apply to full total
 - **PDF output**: Quote PDF shows itemized equipment table (qty/price/total); Contract PDF lists equipment items under menu section
 - **Backward compat**: Old `menu_json.equipment` text field auto-migrates to `equipment_notes` on page load
+
+### Daily Automated Accounting Review (Mar 2026)
+- **Automated daily audit**: 5 AM scheduled job scans Accounting, Hub, and Inventory databases for anomalies
+- **Script**: `services/daily_review.py` — all check logic, cross-DB connections, email report generation
+- **Cross-DB access**: Accounting service connects to Hub DB and Inventory DB via `HUB_DATABASE_URL` and `INVENTORY_DATABASE_URL` env vars
+- **Scheduler**: APScheduler `CronTrigger(hour=5)` in `scheduler.py`, runs in thread pool (`asyncio.to_thread`) to avoid blocking web server
+- **Checks implemented (Sections 1-5E from REVIEW_SPEC.md)**:
+  - Section 1: Invoice accuracy (total mismatch, price outliers >40% from 90-day avg, implausible quantities)
+  - Section 2: GL integrity (unbalanced JEs for all types, corporate area on AP bills, inactive accounts, large manual entries)
+  - Section 3: Inventory cost consistency (stale costs after invoice processing)
+  - Section 4: Duplicate vendor bill detection
+  - Section 5A: Hub ↔ Accounting sync reconciliation (bill lines vs total, missing bills, total mismatches)
+  - Section 5B: Invoice pipeline health (stale ready, missing location, statement misclassification, stuck needs_review, credit memos without lines)
+  - Section 5C: Beverage distributor pricing validation (discount not captured)
+  - Section 5D: Linen service parse quality (Gold Coast Linen price/total swap detection)
+  - Section 5E: Delivery fee/fuel surcharge completeness
+- **Email report**: HTML report emailed to admin@swhgrp.com with severity breakdown, per-section summary, and detailed findings
+- **Persistence**: `daily_review_runs` and `daily_review_findings` tables in accounting DB
+- **Migration**: `20260326_0001_add_daily_review_tables.py`
+- **Spec**: `REVIEW_SPEC.md` — full specification for all checks, auto-correction rules, duplicate resolution, and report format
+- **Phase 1**: Read-only audit + flagging only. No auto-corrections yet (spec defines correction types for future phases)
 
 ### GL Anomaly Review System (Mar 2026)
 - **Automated GL sweep**: Nightly job (3 AM) scans journal entries for anomalies using rules engine + Claude AI analysis

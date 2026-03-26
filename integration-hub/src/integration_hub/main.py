@@ -1576,6 +1576,48 @@ async def bulk_update_invoice_items(
         raise HTTPException(status_code=500, detail=f"Error updating items: {str(e)}")
 
 
+@app.get("/api/expense-items/search")
+async def search_expense_items(
+    search: str = "",
+    vendor_id: int = None,
+    db: Session = Depends(get_db)
+):
+    """Search expense items from invoice_item_mapping table."""
+    from sqlalchemy import text as sql_text
+
+    if not search or len(search) < 2:
+        return {"items": []}
+
+    query = """
+        SELECT m.id, m.item_description, m.item_code, m.inventory_category,
+               m.gl_asset_account, m.gl_cogs_account, m.gl_waste_account,
+               v.name as vendor_name
+        FROM invoice_item_mapping m
+        LEFT JOIN vendors v ON m.vendor_id = v.id
+        WHERE m.inventory_item_id IS NULL
+          AND m.is_active = true
+          AND (m.item_description ILIKE :search OR m.item_code ILIKE :search)
+        ORDER BY m.item_description
+        LIMIT 20
+    """
+    results = db.execute(sql_text(query), {"search": f"%{search}%"}).fetchall()
+
+    items = []
+    for r in results:
+        items.append({
+            "id": r.id,
+            "item_description": r.item_description,
+            "item_code": r.item_code,
+            "category": r.inventory_category,
+            "gl_asset_account": r.gl_asset_account,
+            "gl_cogs_account": r.gl_cogs_account,
+            "gl_waste_account": r.gl_waste_account,
+            "vendor_name": r.vendor_name,
+        })
+
+    return {"items": items}
+
+
 @app.post("/api/invoices/{invoice_id}/items")
 async def add_invoice_item(
     invoice_id: int,
@@ -1613,6 +1655,11 @@ async def add_invoice_item(
         unit_price = Decimal(str(body.get('unit_price', 0)))
         total_amount = quantity * unit_price
 
+        # Check if GL accounts provided (expense item)
+        gl_asset = body.get('gl_asset_account')
+        gl_cogs = body.get('gl_cogs_account')
+        is_mapped = bool(gl_asset or gl_cogs)
+
         new_item = HubInvoiceItem(
             invoice_id=invoice_id,
             line_number=max_line + 1,
@@ -1623,7 +1670,9 @@ async def add_invoice_item(
             pack_size=body.get('pack_size'),
             unit_price=unit_price,
             total_amount=total_amount,
-            is_mapped=False
+            is_mapped=is_mapped,
+            gl_asset_account=gl_asset,
+            gl_cogs_account=gl_cogs,
         )
         db.add(new_item)
         db.flush()
