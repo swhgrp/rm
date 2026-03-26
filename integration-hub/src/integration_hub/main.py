@@ -384,6 +384,24 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
         except (json.JSONDecodeError, TypeError):
             review_reasons = []
 
+    # Replace stale unknown_item_code reasons with current unmapped items
+    if review_reasons:
+        has_unknown_code = any('unknown_item_code' in r for r in review_reasons)
+        if has_unknown_code:
+            # Get currently unmapped items
+            unmapped_items = db.query(HubInvoiceItem).filter(
+                HubInvoiceItem.invoice_id == invoice.id,
+                HubInvoiceItem.is_mapped == False
+            ).all()
+            # Remove old unknown_item_code reasons, add current ones
+            review_reasons = [r for r in review_reasons if 'unknown_item_code' not in r]
+            for item in unmapped_items:
+                desc = item.item_description or item.item_code or 'Unknown'
+                review_reasons.append(f"item_anomaly:unknown_item_code:{desc}")
+            if not unmapped_items and not review_reasons:
+                # All items now mapped, no other reasons — could clear review
+                pass
+
     return templates.TemplateResponse("invoice_detail.html", {
         "request": request,
         "invoice": invoice,
@@ -1294,17 +1312,50 @@ async def get_invoice_csv_data(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    if not invoice.pdf_path:
-        raise HTTPException(status_code=404, detail="Invoice has no file attached")
+    # Determine CSV file path
+    csv_path = None
 
-    file_path = Path(invoice.pdf_path)
+    # 1. Direct CSV file (source_filename or pdf_path is .csv)
+    if invoice.pdf_path and (
+        (invoice.source_filename and invoice.source_filename.lower().endswith('.csv')) or
+        invoice.pdf_path.lower().endswith('.csv')
+    ):
+        csv_path = invoice.pdf_path
+
+    # 2. csv_file_path stored in raw_data
+    if not csv_path and invoice.raw_data and isinstance(invoice.raw_data, dict):
+        csv_path = invoice.raw_data.get('csv_file_path')
+
+    # 3. Find sibling CSV record that shares the same source CSV file
+    #    (e.g., another invoice parsed from the same Fintech/GFS CSV)
+    if not csv_path and invoice.source == 'csv':
+        from integration_hub.models.hub_invoice import HubInvoice as HI
+        # Look for other invoices from same vendor that have a csv_file_path
+        if invoice.vendor_id:
+            sibling = db.query(HI).filter(
+                HI.vendor_id == invoice.vendor_id,
+                HI.source == 'csv',
+                HI.id != invoice.id,
+            ).all()
+            for s in sibling:
+                s_csv = (s.raw_data or {}).get('csv_file_path') if isinstance(s.raw_data, dict) else None
+                if not s_csv and s.pdf_path and s.pdf_path.lower().endswith('.csv'):
+                    s_csv = s.pdf_path
+                if s_csv and Path(s_csv).exists():
+                    # Verify this CSV contains our invoice number
+                    with open(s_csv, 'r', encoding='utf-8') as f:
+                        content_check = f.read()
+                    inv_stripped = (invoice.invoice_number or '').lstrip('0') or '0'
+                    if inv_stripped in content_check:
+                        csv_path = s_csv
+                        break
+
+    if not csv_path:
+        raise HTTPException(status_code=404, detail="No CSV file associated with this invoice")
+
+    file_path = Path(csv_path)
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found on disk")
-
-    is_csv = (invoice.source_filename and invoice.source_filename.lower().endswith('.csv')) or \
-             invoice.pdf_path.lower().endswith('.csv')
-    if not is_csv:
-        raise HTTPException(status_code=400, detail="Invoice file is not a CSV")
+        raise HTTPException(status_code=404, detail="CSV file not found on disk")
 
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -1312,14 +1363,32 @@ async def get_invoice_csv_data(
 
         reader = csv.DictReader(StringIO(content))
         headers = reader.fieldnames or []
-        rows = [row for row in reader]
+        all_rows = [row for row in reader]
+
+        # Filter rows to only show data for this specific invoice
+        # Fintech CSVs contain multiple invoices across vendors/locations in one file
+        inv_num = (invoice.invoice_number or '').strip()
+        inv_num_stripped = inv_num.lstrip('0') or '0'
+
+        filtered_rows = []
+        for row in all_rows:
+            row_inv = (row.get('Invoice Number', '') or '').strip()
+            row_inv_stripped = row_inv.lstrip('0') or '0'
+            if row_inv_stripped == inv_num_stripped:
+                filtered_rows.append(row)
+
+        # If filtering matched rows, use them; otherwise fall back to all rows
+        # (fallback handles edge cases where column name differs)
+        rows = filtered_rows if filtered_rows else all_rows
 
         return {
             "success": True,
             "filename": invoice.source_filename,
             "headers": headers,
             "rows": rows,
-            "row_count": len(rows)
+            "row_count": len(rows),
+            "total_csv_rows": len(all_rows),
+            "filtered": len(filtered_rows) > 0
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading CSV: {str(e)}")

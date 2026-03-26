@@ -538,14 +538,16 @@ class CSVInvoiceParser:
                             )
                             self.db.add(invoice)
 
-                # If replacing a previously sent invoice, reset sync status
-                was_sent = invoice.status == 'sent'
-                if was_sent:
-                    logger.info(f"Invoice {invoice.id} was previously sent — resetting sync for CSV replacement")
+                # If replacing an existing invoice, reset sync status
+                has_sync = invoice.inventory_sync_at or invoice.accounting_sync_at or invoice.status == 'sent'
+                if has_sync:
+                    logger.info(f"Invoice {invoice.id} was previously synced — resetting sync for CSV replacement")
                     invoice.inventory_sent = False
                     invoice.accounting_sent = False
                     invoice.inventory_error = None
                     invoice.accounting_error = None
+                    invoice.inventory_sync_at = None
+                    invoice.accounting_sync_at = None
 
                 # Clear review flags
                 invoice.needs_review = False
@@ -575,12 +577,13 @@ class CSVInvoiceParser:
                     except Exception as e:
                         logger.warning(f"Vendor matching failed for '{inv_data['vendor_name']}': {e}")
 
-                # Store raw data for reference
+                # Store raw data for reference (include CSV file path for viewer)
                 invoice.raw_data = {
                     'source': 'fintech_csv',
                     'store_number': inv_data['store_number'],
                     'retailer_name': inv_data['retailer_name'],
-                    'item_count': len(inv_data['items'])
+                    'item_count': len(inv_data['items']),
+                    'csv_file_path': str(hub_invoice.pdf_path) if hub_invoice.pdf_path else None
                 }
 
                 self.db.flush()  # Get invoice ID for items

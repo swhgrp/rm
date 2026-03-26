@@ -1277,12 +1277,14 @@ function calculateTotals() {
                 const amount = parseFloat(line.amount) || 0;
                 const lineTips = parseFloat(line.tips) || 0;
 
-                if (paymentType === 'CARD' || paymentType === 'CREDIT CARD' || paymentType === 'DEBIT CARD') {
-                    cardAmount += amount;
-                    cardTips += lineTips;
-                } else if (paymentType === 'CASH') {
+                if (paymentType === 'CASH') {
                     cashAmount += amount;
                     cashTips += lineTips;
+                } else {
+                    // All non-cash payments (card, DoorDash, UberEats, etc.)
+                    // are deposited to bank accounts like credit cards
+                    cardAmount += amount;
+                    cardTips += lineTips;
                 }
             });
 

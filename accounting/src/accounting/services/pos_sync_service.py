@@ -939,16 +939,23 @@ class POSSyncService:
         #     Expected Cash Deposit = Cash Sales - Tips Paid Out - Payouts
         #
         # Total Deposits = Card Deposit + Expected Cash Deposit
-        #                = (Card Amount + Card Tips) + (Cash Amount - Card Tips - Payouts)
-        #                = Card Amount + Cash Amount - Payouts
+        #                = (Card + Tips + ThirdParty - Refunds) + (Cash - Tips Paid - Payouts)
+        #                = Card + ThirdParty + Cash - Refunds - Payouts
         #                = Total Collected - Payouts (when no variance)
 
         card_amount = payment_methods.get("CARD", Decimal('0'))
         card_tips = payment_tips_by_method.get("CARD", Decimal('0'))
 
-        # Card deposit = full card amount INCLUDING tips (this is what the processor deposits)
-        # Minus any refunds (which reduce the deposit)
-        card_deposit = card_amount + card_tips - total_refunds
+        # Third-party payments (DoorDash, UberEats, etc.) are deposited to bank like credit cards
+        # They go to Undeposited Funds and get reconciled later — NOT through the cash drawer
+        third_party_amount = sum(
+            amount for ptype, amount in payment_methods.items()
+            if ptype not in ("CARD", "CASH")
+        )
+
+        # Card deposit = card amount + card tips + third-party amounts - refunds
+        # This represents all non-cash deposits (processor deposits + third-party deposits)
+        card_deposit = card_amount + card_tips + third_party_amount - total_refunds
 
         # Cash deposit calculation
         cash_amount = payment_methods.get("CASH", Decimal('0'))

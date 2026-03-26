@@ -204,14 +204,18 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 
 ### CSV Expected Vendors & PDF Reference Status (Mar 2026)
 - **CSV expected vendors**: `csv_expected_vendors` table tracks vendor+location combos where CSV invoices are the primary format
+- **8 vendors configured**: Southern Glazer's (all 6), Breakthru (all 6), GFS (all 6), Gold Coast (5), Southern Eagle (4), Double Eagle (2), Republic National (2), J.J. Taylor (1), Western Beverage (2)
 - **`pdf_reference` status**: When a PDF invoice arrives for a CSV-expected vendor, it's stored as reference only (not parsed/mapped)
 - **PDF-to-CSV replacement**: When CSV arrives and a matching PDF invoice exists (same number+location), CSV data replaces the PDF data — regardless of current status (including `sent`)
-- **Sent invoice reset**: When CSV replaces a previously-sent invoice, `inventory_sent`/`accounting_sent` flags are cleared for re-sync
-- **Leading-zero matching**: Invoice number comparison strips leading zeros (e.g., `0903123` matches `903123`)
-- **GFS included**: GFS (vendor_id=5) added to csv_expected_vendors for all 6 locations — PDFs auto-tagged as `pdf_reference`
-- **Model**: `CsvExpectedVendor` with `vendor_id`, `location_id`, `is_active`, seeded with beverage distributors + GFS across all 6 locations
-- **Service**: `csv_preference.py` — `is_csv_expected()` with in-memory caching
-- **UI**: `pdf_reference` status shown as "PDF Reference" badge; grouped under "Statements" tab in invoice list
+- **Sent invoice reset**: When CSV replaces a previously-sent invoice, `inventory_sent`/`accounting_sent` and sync timestamps are cleared for re-sync
+- **Leading-zero matching**: Invoice number comparison strips leading zeros (e.g., `0903123` matches `903123`) — used in both duplicate detection and CSV-over-PDF replacement
+- **Duplicate detection**: `invoice_parser.py` uses two-strategy dedup: (1) vendor_id + stripped invoice number, (2) vendor name + stripped invoice number; respects location boundaries
+- **CSV file tracking**: `raw_data.csv_file_path` stores path to source CSV file on CSV-replaced invoices for the CSV viewer
+- **CSV viewer filtering**: `/api/invoices/{id}/csv-data` endpoint filters multi-vendor/multi-location CSV files to show only rows matching the specific invoice number
+- **GFS CSV start date**: GFS added to csv_expected_vendors on 3/25/2026; pre-3/13 GFS invoices are PDF-only (no CSV available)
+- **Model**: `CsvExpectedVendor` with `vendor_id`, `location_id`, `is_active`
+- **Service**: `csv_preference.py` — `is_csv_expected()` with in-memory caching (refreshes on container restart)
+- **UI**: `pdf_reference` status shown as "PDF Reference" badge; grouped under "Statements" tab in invoice list; CSV-source invoices show both PDF and CSV viewer buttons
 - **Migration**: `20260318_0001_add_csv_expected_vendors.py`
 
 ### GFS CSV Invoice Parsing (Mar 2026)
@@ -247,6 +251,8 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - **Proportional discount scaling**: Percentage-based Clover discounts (amount=None, percentage only) are proportionally scaled so breakdown sums exactly to `effective_discounts` (authoritative from payments) — eliminates rounding adjustments
 - **Automated review & post**: `scripts/dss_review_and_post.py` — validates math, GL mappings, duplicates, payouts; auto-posts clean entries, flags issues
 - **Cash deposit logic**: Negative cash deposit (tips exceed cash) credits the location's Safe GL account; positive cash deposits debit the deposit account
+- **Third-party payment handling**: DoorDash, UberEats, and other non-cash payments treated like credit cards — included in `card_deposit` calculation, deposited to Undeposited Funds for later reconciliation
+- **Deposit formula**: `card_deposit = card_amount + card_tips + third_party_amount - refunds`; `expected_cash = cash_amount - tips_paid_out - payouts`
 - **Seaside Grill rolling safe**: CASH payment type maps to `1014 - Safe - Seaside Grill` (not 1091); all cash flows through safe as rolling balance
 - **Payout accounting**: Cash payouts from Clover `cash_events` API create DEBIT lines to assigned GL accounts; payouts reduce expected cash deposit
 - **Payment GL enforcement**: No fallback to default accounts for unmapped payment types — sync leaves `deposit_account_id=NULL`, caught during posting validation

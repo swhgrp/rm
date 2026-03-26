@@ -1554,16 +1554,43 @@ class InvoiceParser:
             invoice.is_statement = parsed_data.get('is_statement', False)  # AI-detected statement flag
             invoice.raw_data = parsed_data
 
-            # Check for duplicate invoice (same invoice_number + vendor_name, different record)
-            if invoice.invoice_number and invoice.vendor_name:
-                # Normalize vendor name for comparison (case-insensitive, trim whitespace)
-                normalized_vendor = invoice.vendor_name.strip().upper()
+            # Check for duplicate invoice (same invoice_number + vendor, different record)
+            # Uses leading-zero-stripped matching to catch Fintech variants (04827201 vs 4827201)
+            if invoice.invoice_number:
+                inv_num_stripped = invoice.invoice_number.lstrip('0') or '0'
+                duplicate = None
 
-                duplicate = db.query(HubInvoice).filter(
-                    HubInvoice.id != invoice_id,
-                    HubInvoice.invoice_number == invoice.invoice_number,
-                    func.upper(func.trim(HubInvoice.vendor_name)) == normalized_vendor
-                ).first()
+                # Strategy 1: Match by vendor_id + leading-zero-stripped invoice number
+                if invoice.vendor_id:
+                    candidates = db.query(HubInvoice).filter(
+                        HubInvoice.id != invoice_id,
+                        HubInvoice.vendor_id == invoice.vendor_id,
+                        HubInvoice.status != 'duplicate',
+                    ).all()
+                    for c in candidates:
+                        c_num = (c.invoice_number or '').lstrip('0') or '0'
+                        if c_num == inv_num_stripped:
+                            # If both have location, they must match
+                            if invoice.location_id and c.location_id and invoice.location_id != c.location_id:
+                                continue
+                            duplicate = c
+                            break
+
+                # Strategy 2: Match by vendor name + leading-zero-stripped invoice number
+                if not duplicate and invoice.vendor_name:
+                    normalized_vendor = invoice.vendor_name.strip().upper()
+                    candidates = db.query(HubInvoice).filter(
+                        HubInvoice.id != invoice_id,
+                        func.upper(func.trim(HubInvoice.vendor_name)) == normalized_vendor,
+                        HubInvoice.status != 'duplicate',
+                    ).all()
+                    for c in candidates:
+                        c_num = (c.invoice_number or '').lstrip('0') or '0'
+                        if c_num == inv_num_stripped:
+                            if invoice.location_id and c.location_id and invoice.location_id != c.location_id:
+                                continue
+                            duplicate = c
+                            break
 
                 if duplicate:
                     # This is a duplicate - mark it and return

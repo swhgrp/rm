@@ -12,13 +12,30 @@
             </div>
             <div>
                 {% if invoice.pdf_path %}
-                    {% set is_csv = invoice.source_filename and invoice.source_filename.lower().endswith('.csv') %}
-                    {% if is_csv %}
-                    <button class="btn btn-info" onclick="toggleCsvViewer()">
+                    {% set is_csv_file = invoice.source_filename and invoice.source_filename.lower().endswith('.csv') %}
+                    {% set is_csv_source = invoice.source == 'csv' %}
+                    {% set has_pdf = invoice.pdf_path and not invoice.pdf_path.lower().endswith('.csv') %}
+                    {% if is_csv_file %}
+                    {% if has_pdf %}
+                    <a href="/hub/api/invoices/{{ invoice.id }}/pdf" target="_blank" class="btn btn-info">
+                        <i class="bi bi-file-pdf"></i> View PDF
+                    </a>
+                    {% endif %}
+                    <button class="btn btn-warning" onclick="toggleCsvViewer()">
                         <i class="bi bi-filetype-csv"></i> View CSV
                     </button>
                     <a href="/hub/api/invoices/{{ invoice.id }}/pdf?download=1" class="btn btn-success">
                         <i class="bi bi-download"></i> Download CSV
+                    </a>
+                    {% elif is_csv_source %}
+                    <a href="/hub/api/invoices/{{ invoice.id }}/pdf" target="_blank" class="btn btn-info">
+                        <i class="bi bi-file-pdf"></i> View PDF
+                    </a>
+                    <button class="btn btn-warning" onclick="toggleCsvViewer()">
+                        <i class="bi bi-filetype-csv"></i> View CSV
+                    </button>
+                    <a href="/hub/api/invoices/{{ invoice.id }}/pdf?download=1" class="btn btn-success">
+                        <i class="bi bi-download"></i> Download PDF
                     </a>
                     {% else %}
                     <a href="/hub/api/invoices/{{ invoice.id }}/pdf" target="_blank" class="btn btn-info">
@@ -258,7 +275,7 @@
     </div>
 
     <!-- CSV Viewer Panel -->
-    {% set is_csv = invoice.source_filename and invoice.source_filename.lower().endswith('.csv') %}
+    {% set is_csv = (invoice.source_filename and invoice.source_filename.lower().endswith('.csv')) or invoice.source == 'csv' %}
     {% if is_csv %}
     <div class="card mt-4" id="csvViewerPanel" style="display: none;">
         <div class="card-header d-flex justify-content-between align-items-center">

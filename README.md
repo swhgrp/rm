@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** March 21, 2026
+**Last Updated:** March 25, 2026
 **Status:** ~98% Complete - All 11 Systems Production Ready ✅
-**Latest:** DSS discount scaling, safe account routing, payout GL lines, payment mapping enforcement (Mar 21, 2026) ✅
+**Latest:** Fintech duplicate detection, CSV viewer filtering, third-party payment deposits, CSV-over-PDF replacement improvements (Mar 25, 2026) ✅
 
 ---
 
@@ -590,6 +590,7 @@ restaurant-system/
 
 **Daily Sales & Vendor Improvements (Mar 2026):** 🌟
 - ✅ **DSS GL validation** — server-side + client-side validation of all GL account mappings before posting journal entry
+- ✅ **Third-party payment deposits** — DoorDash, UberEats, etc. included in card_deposit calculation (not just CARD payments)
 - ✅ **Inactive vendor reactivation** — VendorService reuses inactive vendors with matching name instead of creating duplicates
 
 **GL Review & Anomaly Detection (NEW Mar 2026):** 🌟
@@ -774,8 +775,11 @@ restaurant-system/
 - ✅ **Enhanced GL validation** - Different requirements for inventory vs expense items
 
 **🆕 CSV Expected Vendors & GFS Parsing (Mar 2026):** 🌟
-- ✅ **CSV expected vendors** — tracks vendor+location combos where CSV is the primary invoice format
+- ✅ **CSV expected vendors** — 8 vendors (34 vendor+location combos) where CSV is the primary invoice format
 - ✅ **`pdf_reference` status** — PDF invoices for CSV-expected vendors stored for reference only, replaced when CSV arrives
+- ✅ **Leading-zero duplicate detection** — Fintech CSV invoice numbers (e.g., `04827201`) matched against PDFs (`4827201`) using stripped comparison
+- ✅ **CSV viewer filtering** — multi-vendor/multi-location CSV files filtered to show only the specific invoice's rows
+- ✅ **CSV-over-PDF replacement** — CSV data replaces PDF-parsed data regardless of status; clears sync flags for re-send
 - ✅ **GFS CSV format support** — auto-detects GFS column headers, maps to standard format, handles catch-weight items
 - ✅ **CSV-aware auto-mapping** — skips fuzzy matching for CSV data (exact SKUs only, prevents wrong product matches)
 - ✅ **Line item deduplication** — deduplicates items from GFS PDFs that render items twice (text + table)
@@ -1661,11 +1665,14 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 - ✅ **File manager improvements** - Owner-only folders, search enhancements (Mar 11, 2026)
 - ✅ **GFS CSV invoice parsing** — Multi-format CSV support, catch-weight handling, PDF-to-CSV replacement (Mar 20, 2026)
 - ✅ **DSS GL validation** — Server+client-side GL account validation before posting daily sales (Mar 20, 2026)
+- ✅ **Fintech duplicate detection** — Leading-zero-stripped invoice matching prevents Fintech CSV/PDF duplicates (Mar 25, 2026)
+- ✅ **CSV viewer filtering** — Multi-vendor CSV files filtered to show only relevant invoice rows (Mar 25, 2026)
+- ✅ **Third-party payment deposits** — DoorDash/UberEats included in DSS card_deposit calculation (Mar 25, 2026)
 
 ---
 
-**Version:** 4.5
-**Last Updated:** March 20, 2026
+**Version:** 4.6
+**Last Updated:** March 25, 2026
 **Maintained By:** SW Hospitality Group Development Team
 
 **For developer reference, see [CLAUDE.md](./CLAUDE.md)**
@@ -1676,7 +1683,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 For detailed development history, see the git log. Key milestones:
 
-- **Mar 2026** — GFS CSV parsing, PDF reference invoices, CSV expected vendors, DSS GL validation, vendor reactivation, mobile app (iOS auth + inventory), catering contracts, CalDAV item sync, GL anomaly detection, count session reports, e-signatures
+- **Mar 2026** — Fintech duplicate detection, CSV viewer filtering, third-party payment deposits, GFS CSV parsing, PDF reference invoices, CSV expected vendors, DSS GL validation, vendor reactivation, mobile app (iOS auth + inventory), catering contracts, CalDAV item sync, GL anomaly detection, count session reports, e-signatures
 - **Feb 2026** — UOM simplification (single purchase UOM per vendor item), post-parse invoice validation, food safety incidents, HR required documents, order sheets, vendor item name normalization
 - **Jan 2026** — Maintenance system, food safety system, Plaid bank integration, quick holds, CalDAV sync
 - **Dec 2025** — Location-aware costing architecture, Hub source of truth, AI semantic search, expense/vendor item separation, vendor items pagination

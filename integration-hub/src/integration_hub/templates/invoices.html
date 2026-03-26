@@ -354,7 +354,7 @@ function updateTabCounts() {
         // Count based on actual status - simpler and matches database
         if (status === 'duplicate') {
             counts.duplicates++;
-        } else if (status === 'pending' || status === 'pending_csv' || status === 'mapping') {
+        } else if (status === 'pending' || status === 'pending_csv' || status === 'mapping' || status === 'needs_review') {
             counts.pending++;
         } else if (status === 'ready') {
             counts.ready++;
