@@ -9,7 +9,7 @@
 **Production URL:** https://rm.swhgrp.com
 **Last Updated:** March 27, 2026
 **Status:** ~98% Complete - All 11 Systems Production Ready ✅
-**Latest:** Invoice PDF verification system — Claude Vision auto-corrects parsing errors, triple-check flow, daily review integration (Mar 27, 2026) ✅
+**Latest:** Weekly forensic accounting review — Benford's Law, vendor forensics, tax optimization, cross-system integrity (Mar 27, 2026) ✅
 
 ---
 
@@ -746,6 +746,14 @@ restaurant-system/
 - ✅ **Simplified cost path** - Single deterministic `cost_per_primary = unit_price / pack_to_primary_factor` (no fallbacks)
 - ✅ **Vendor parsing rules** - Per-vendor AI instructions for invoice column disambiguation (e.g., Breakthru Case/Btles/Pieces columns)
 - ✅ **Vendor item imports** - Republic National Distributing (32 items from eRNDC), Southern Glaziers (148 items from CSV)
+
+**🆕 Weekly Forensic Accounting Review (Mar 27, 2026):**
+- ✅ **Deep-dive audit** - Sunday 6 AM forensic-level review across Accounting, Hub, and Inventory databases
+- ✅ **7 audit sections** - Transaction flow, vendor forensics, GL analysis (Benford's Law), inventory costs, cross-system integrity, AP/cash flow, tax optimization
+- ✅ **Tax classification** - Capital vs expense (>$2,500), repair vs improvement (keyword detection), employee meals, entertainment categorization
+- ✅ **Vendor forensics** - Price creep analysis, invoice number gaps, round-number patterns, activity anomalies
+- ✅ **GL forensics** - Benford's Law chi-squared test, manual JE review, weekend entries, dormant account activation
+- ✅ **HTML email report** - Severity breakdown with per-section findings emailed weekly
 
 **🆕 Invoice PDF Verification & Auto-Fix (Mar 27, 2026):**
 - ✅ **Claude Vision verification** - Re-reads original PDF via Claude Sonnet, compares against DB, auto-corrects parsing errors

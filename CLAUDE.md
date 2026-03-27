@@ -213,6 +213,21 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - **Spec**: `REVIEW_SPEC.md` — full specification for all checks, auto-correction rules, duplicate resolution, and report format
 - **Phase 1**: Read-only audit + flagging only. No auto-corrections yet (spec defines correction types for future phases)
 
+### Weekly Forensic Accounting Review (Mar 2026)
+- **Deep-dive audit**: Sunday 6 AM scheduled job — forensic-level review across Accounting, Hub, and Inventory databases
+- **Script**: `services/weekly_review.py` — 7 sections, reuses daily review Finding model and persistence tables
+- **Scheduler**: APScheduler `CronTrigger(day_of_week='sun', hour=6)` in `scheduler.py`, runs in thread pool
+- **Section 1**: End-to-end transaction flow — traces Hub invoice → Accounting bill → JE, checks amounts match at each hop
+- **Section 2**: Vendor forensics — price creep (90-day trends), invoice number gaps, round-number analysis, activity spikes/drops
+- **Section 3**: GL forensic analysis — Benford's Law (chi-squared test on first-digit distribution), manual JE review (>$1,000), weekend entries, dormant account activation, reversed entries
+- **Section 4**: Inventory cost integrity — cost divergence (>25%), cross-location price consistency
+- **Section 5**: Cross-system data integrity — inactive accounts in posted JEs, invalid area references, orphaned master item references in Hub
+- **Section 6**: AP/cash flow reconciliation — undeposited funds balance, cash over/short trending, overdue AP bills
+- **Section 7**: Tax optimization — capital vs expense (>$2,500 IRS de minimis), repair vs capital improvement (keyword detection), employee meals GL tracking, entertainment/marketing categorization, large non-inventory expenses
+- **Email report**: HTML report emailed to admin@swhgrp.com with severity breakdown, per-section summary, and detailed findings
+- **Persistence**: Stored in `daily_review_runs` and `daily_review_findings` tables (shared with daily review, prefixed `weekly-` run IDs)
+- **Cross-DB access**: Same `HUB_DATABASE_URL` and `INVENTORY_DATABASE_URL` env vars as daily review
+
 ### Invoice PDF Verification System (Mar 2026)
 - **Claude Vision verification**: Re-reads original PDF via Claude Sonnet Vision (Anthropic API), compares against DB data, auto-corrects discrepancies
 - **Triple-check flow**: (1) Extract items from PDF with Claude, (2) Compare & auto-fix, (3) Re-extract to confirm corrections match

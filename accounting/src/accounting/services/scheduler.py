@@ -19,6 +19,7 @@ from accounting.db.database import SessionLocal
 from accounting.models.pos import POSConfiguration
 from accounting.services.pos_sync_service import POSSyncService
 from accounting.services.daily_review import daily_review_task
+from accounting.services.weekly_review import weekly_review_task
 
 logger = logging.getLogger(__name__)
 
@@ -458,12 +459,22 @@ def start_scheduler():
             max_instances=1
         )
 
+        # Add weekly forensic accounting review - runs at 6 AM every Sunday
+        scheduler.add_job(
+            weekly_review_task,
+            trigger=CronTrigger(day_of_week='sun', hour=6, minute=0),
+            id='weekly_forensic_review',
+            name='Weekly forensic accounting review',
+            replace_existing=True,
+            max_instances=1
+        )
+
         # Start the scheduler
         scheduler.start()
         logger.info("Background scheduler started successfully")
         logger.info("Auto-sync task will check every 10 minutes for locations due for sync")
         logger.info("Startup catchup task will run immediately to sync any missed days")
-        logger.info("GL sweep daily at 3:00 AM, daily review at 5:00 AM, baseline rebuild monthly at 4:00 AM on 1st")
+        logger.info("GL sweep daily at 3:00 AM, daily review at 5:00 AM, weekly review Sundays at 6:00 AM, baseline rebuild monthly at 4:00 AM on 1st")
         logger.info(f"Scheduler jobs: {scheduler.get_jobs()}")
 
     except Exception as e:

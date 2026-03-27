@@ -6,9 +6,20 @@ The Accounting System is a comprehensive double-entry accounting platform provid
 
 ## Status: 97% Production Ready ✅
 
-**Last Updated:** March 26, 2026
+**Last Updated:** March 27, 2026
 
 ## Recent Updates
+
+### March 27, 2026 - Weekly Forensic Accounting Review
+- ✅ **Sunday 6 AM deep-dive** — 7-section forensic audit across Accounting, Hub, and Inventory databases
+- ✅ **Transaction flow tracing** — Hub invoice → Accounting bill → Journal Entry, verifies amounts match at each hop
+- ✅ **Vendor forensics** — price creep (90-day trends), invoice number gaps, round-number analysis, activity anomalies
+- ✅ **GL forensics** — Benford's Law (chi-squared test), manual JE review (>$1,000), weekend entries, dormant accounts
+- ✅ **Inventory cost integrity** — cost divergence >25%, cross-location price consistency checks
+- ✅ **Cross-system integrity** — inactive accounts in posted JEs, invalid area references, orphaned master items
+- ✅ **AP/cash flow** — undeposited funds aging, cash over/short trending, overdue AP bills
+- ✅ **Tax optimization** — capital vs expense ($2,500 threshold), repair vs improvement, employee meals, entertainment
+- ✅ **HTML email report** — weekly summary with severity breakdown emailed to admin@swhgrp.com
 
 ### March 27, 2026 - Invoice PDF Verification & Auto-Fix (Claude Vision)
 - ✅ **Section 5F** — daily review auto-verifies invoices with parsing issues against original PDFs using Claude Sonnet Vision
