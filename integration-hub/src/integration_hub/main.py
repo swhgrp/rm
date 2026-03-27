@@ -2577,12 +2577,36 @@ async def convert_vendor_item_to_expense(vendor_item_id: int, request: Request, 
             mapping_id = result.fetchone()[0]
             logger.info(f"Created new expense mapping {mapping_id} for vendor item {vendor_item_id}")
 
-        # Also clear inventory_item_id on invoice items pointing to this vendor item
+        # Update invoice items pointing to this vendor item on unsent invoices:
+        # clear inventory_item_id AND update GL accounts/category to match expense mapping
+        updated_count = db.execute(sql_text("""
+            UPDATE hub_invoice_items ii
+            SET inventory_item_id = NULL,
+                gl_cogs_account = :cogs,
+                gl_asset_account = :cogs,
+                inventory_category = COALESCE(:category, inventory_category),
+                mapping_method = 'expense_mapping'
+            FROM hub_invoices i
+            WHERE ii.invoice_id = i.id
+              AND ii.inventory_item_id = :vi_id
+              AND i.status NOT IN ('sent')
+              AND COALESCE(i.sent_to_inventory, false) = false
+              AND COALESCE(i.sent_to_accounting, false) = false
+        """), {
+            "vi_id": vendor_item_id,
+            "cogs": gl_cogs_account,
+            "category": vendor_item.category
+        }).rowcount
+
+        # For already-sent invoices, just clear the inventory_item_id
         db.execute(sql_text("""
             UPDATE hub_invoice_items
             SET inventory_item_id = NULL
             WHERE inventory_item_id = :vi_id
         """), {"vi_id": vendor_item_id})
+
+        if updated_count:
+            logger.info(f"Updated GL accounts on {updated_count} unsent invoice items to expense GL {gl_cogs_account}")
 
         # Delete the vendor item - expense items don't belong in vendor items table
         # The expense mapping in invoice_item_mapping_deprecated is the only record needed
@@ -3013,14 +3037,24 @@ async def update_expense_mapping(
     )
 
     # Also update any matching hub_invoice_items (best-effort, don't fail if none exist)
+    # Update both cogs and asset accounts, and also match by item_code
     item_description = row[1]
+    # Get item_code from the mapping too
+    mapping_row = db.execute(
+        sql_text("SELECT item_code FROM invoice_item_mapping WHERE id = :id"),
+        {"id": mapping_id}
+    ).fetchone()
+    item_code = mapping_row[0] if mapping_row else None
+
     db.execute(
         sql_text("""
             UPDATE hub_invoice_items
-            SET gl_cogs_account = :cogs
+            SET gl_cogs_account = :cogs,
+                gl_asset_account = :cogs
             WHERE item_description = :desc
+               OR (item_code = :code AND :code IS NOT NULL)
         """),
-        {"cogs": gl_cogs_account_int, "desc": item_description}
+        {"cogs": gl_cogs_account_int, "desc": item_description, "code": item_code}
     )
 
     db.commit()
@@ -3392,6 +3426,11 @@ async def approve_invoice_review(invoice_id: int, db: Session = Depends(get_db))
 
     logger.info(f"Invoice {invoice_id} review approved. Previous reasons: {old_reasons}. New status: {new_status}")
 
+    # Auto-send if invoice is now ready
+    if new_status == 'ready':
+        import asyncio
+        asyncio.create_task(_send_invoice_background(invoice_id))
+
     return {
         "success": True,
         "message": f"Review cleared. Status: {new_status}",
@@ -3425,6 +3464,79 @@ async def retry_invoice_send(
         result = await auto_send.retry_failed_send(invoice_id, db, retry_system=system)
         return result
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# INVOICE VERIFICATION (PDF-to-DB comparison & auto-correction)
+# ============================================================================
+
+@app.post("/api/invoices/{invoice_id}/verify")
+async def verify_invoice_against_pdf(
+    invoice_id: int,
+    auto_fix: bool = True,
+    db: Session = Depends(get_db)
+):
+    """
+    Verify a single invoice against its original PDF.
+
+    Uses GPT-4o Vision to re-read the PDF, compares against DB data,
+    auto-corrects discrepancies, and re-verifies.
+
+    Args:
+        invoice_id: Hub invoice ID
+        auto_fix: If True, automatically correct discrepancies
+    """
+    try:
+        from integration_hub.services.invoice_verifier import verify_invoice
+        result = verify_invoice(invoice_id, db, auto_fix=auto_fix)
+
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Verification failed"))
+
+        # Auto-send if invoice became ready after corrections
+        if result.get("corrections_count", 0) > 0:
+            invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+            if invoice and invoice.status == 'ready':
+                import asyncio
+                asyncio.create_task(_send_invoice_background(invoice_id))
+                result["auto_send_triggered"] = True
+
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Invoice verification failed for {invoice_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/invoices/verify-batch")
+async def verify_invoices_batch(
+    status: str = None,
+    limit: int = 20,
+    auto_fix: bool = True,
+    db: Session = Depends(get_db)
+):
+    """
+    Batch verify unsent invoices against their PDFs.
+
+    Targets invoices with PDFs that haven't been sent to Accounting/Inventory.
+    Used by the daily review system.
+
+    Args:
+        status: Optional status filter (e.g. 'needs_review', 'mapping', 'ready')
+        limit: Max invoices to process (default 20, max 100)
+        auto_fix: If True, automatically correct discrepancies
+    """
+    if limit > 100:
+        limit = 100
+
+    try:
+        from integration_hub.services.invoice_verifier import batch_verify_invoices
+        result = batch_verify_invoices(db, status_filter=status, limit=limit, auto_fix=auto_fix)
+        return result
+    except Exception as e:
+        logger.error(f"Batch verification failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

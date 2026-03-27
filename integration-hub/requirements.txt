@@ -14,6 +14,7 @@ python-dateutil==2.8.2
 httpx==0.25.2
 APScheduler==3.10.4
 openai==1.12.0
+anthropic>=0.39.0
 pgvector==0.2.4
 numpy==1.26.2
 PyPDF2==3.0.1

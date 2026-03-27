@@ -5,7 +5,7 @@ Microservices-based restaurant management platform for SW Hospitality Group.
 - **Production URL:** https://rm.swhgrp.com
 - **Architecture:** 11 FastAPI microservices behind Nginx reverse proxy, each with its own PostgreSQL database
 - **Portal:** Central auth + UI at `/portal/`, serves templates from each service's template directory
-- **Last Updated:** March 26, 2026
+- **Last Updated:** March 27, 2026
 
 ## Infrastructure & Development Environment
 - **Production Server:** Linode Ubuntu instance at `/opt/restaurant-system/`
@@ -206,11 +206,25 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
   - Section 5C: Beverage distributor pricing validation (discount not captured)
   - Section 5D: Linen service parse quality (Gold Coast Linen price/total swap detection)
   - Section 5E: Delivery fee/fuel surcharge completeness
+  - Section 5F: PDF verification & auto-fix — calls Hub verify API (Claude Vision) to auto-correct parsing errors
 - **Email report**: HTML report emailed to admin@swhgrp.com with severity breakdown, per-section summary, and detailed findings
 - **Persistence**: `daily_review_runs` and `daily_review_findings` tables in accounting DB
 - **Migration**: `20260326_0001_add_daily_review_tables.py`
 - **Spec**: `REVIEW_SPEC.md` — full specification for all checks, auto-correction rules, duplicate resolution, and report format
 - **Phase 1**: Read-only audit + flagging only. No auto-corrections yet (spec defines correction types for future phases)
+
+### Invoice PDF Verification System (Mar 2026)
+- **Claude Vision verification**: Re-reads original PDF via Claude Sonnet Vision (Anthropic API), compares against DB data, auto-corrects discrepancies
+- **Triple-check flow**: (1) Extract items from PDF with Claude, (2) Compare & auto-fix, (3) Re-extract to confirm corrections match
+- **Service**: `integration-hub/src/integration_hub/services/invoice_verifier.py`
+- **API endpoints**: `POST /api/invoices/{id}/verify` (single), `POST /api/invoices/verify-batch` (batch)
+- **UI**: "Verify vs PDF" button on invoice detail page for unsent invoices with PDFs
+- **Auto-correction**: Fixes item codes (transpositions), quantities, unit prices, line totals; adds missing items
+- **Matching strategies**: exact code → near code (1-digit diff) → description+total → total match
+- **Daily review integration**: Section 5F auto-verifies and fixes candidates at 5 AM (calls Hub verify API which uses Claude)
+- **Post-correction**: Runs post-parse validation and status recalculation; auto-sends if invoice becomes ready
+- **Model**: Configurable via `INVOICE_VERIFY_MODEL` env var (default: `claude-sonnet-4-20250514`)
+- **Why Claude over GPT-4o**: Claude is more accurate at reading exact item codes, doesn't transpose digits or combine similar line items
 
 ### GL Anomaly Review System (Mar 2026)
 - **Automated GL sweep**: Nightly job (3 AM) scans journal entries for anomalies using rules engine + Claude AI analysis

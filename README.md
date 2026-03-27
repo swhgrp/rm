@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** March 26, 2026
+**Last Updated:** March 27, 2026
 **Status:** ~98% Complete - All 11 Systems Production Ready ✅
-**Latest:** Daily automated accounting review with email reports, vendor bill validation defense-in-depth (Mar 26, 2026) ✅
+**Latest:** Invoice PDF verification system — Claude Vision auto-corrects parsing errors, triple-check flow, daily review integration (Mar 27, 2026) ✅
 
 ---
 
@@ -602,7 +602,8 @@ restaurant-system/
 
 **Daily Automated Accounting Review (NEW Mar 2026):** 🔥
 - ✅ **Cross-system daily audit** — scans Accounting, Hub, and Inventory DBs at 5 AM daily
-- ✅ **10 check categories** — invoice accuracy, GL integrity, sync reconciliation, pipeline health, beverage pricing, linen parse quality, delivery fees, duplicate detection
+- ✅ **11 check categories** — invoice accuracy, GL integrity, sync reconciliation, pipeline health, beverage pricing, linen parse quality, delivery fees, duplicate detection, PDF verification & auto-fix
+- ✅ **PDF verification (Section 5F)** — Claude Vision re-reads invoice PDFs, auto-corrects parsing errors (item codes, prices, quantities), re-verifies
 - ✅ **Email report** — HTML summary with critical/warning/info findings emailed to admin
 - ✅ **4-layer vendor bill validation** — post-parse validator → Hub sender reject → Accounting receiver reject → JE balance check
 - ✅ **Finding persistence** — all findings stored in `daily_review_runs` / `daily_review_findings` tables
@@ -745,6 +746,14 @@ restaurant-system/
 - ✅ **Simplified cost path** - Single deterministic `cost_per_primary = unit_price / pack_to_primary_factor` (no fallbacks)
 - ✅ **Vendor parsing rules** - Per-vendor AI instructions for invoice column disambiguation (e.g., Breakthru Case/Btles/Pieces columns)
 - ✅ **Vendor item imports** - Republic National Distributing (32 items from eRNDC), Southern Glaziers (148 items from CSV)
+
+**🆕 Invoice PDF Verification & Auto-Fix (Mar 27, 2026):**
+- ✅ **Claude Vision verification** - Re-reads original PDF via Claude Sonnet, compares against DB, auto-corrects parsing errors
+- ✅ **Triple-check flow** - (1) Extract from PDF, (2) Compare & auto-fix, (3) Re-extract to confirm corrections match
+- ✅ **Daily review auto-fix** - Section 5F at 5 AM identifies mismatched invoices and auto-corrects via Claude
+- ✅ **"Verify vs PDF" button** - Manual trigger on invoice detail page for unsent invoices
+- ✅ **Smart matching** - Exact code → near code (1-digit transposition) → description+total → total match
+- ✅ **Post-correction pipeline** - Re-validates, recalculates status, auto-sends if invoice becomes ready
 
 **🤖 AI Semantic Search & Backbar-Style Sizing (Dec 28, 2025):**
 - ✅ **AI-powered semantic search** - Find vendor items using natural language

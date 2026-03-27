@@ -834,6 +834,173 @@ def check_delivery_fee_completeness(hub_engine, review_window: datetime) -> List
 
 
 # ===================================================================
+# Section 5F — PDF Verification & Auto-Fix (Hub API + Claude Vision)
+# ===================================================================
+
+HUB_INTERNAL_URL = os.getenv("HUB_INTERNAL_URL", "http://integration-hub:8000")
+
+
+def check_pdf_verification(hub_engine, review_window: datetime) -> List[Finding]:
+    """
+    Find invoices with parsing issues, call Hub verify endpoint (Claude Vision)
+    to auto-fix them, and report results.
+
+    Flow:
+    1. Query Hub DB for unsent invoices with total mismatches or needs_review
+    2. Call Hub POST /api/invoices/{id}/verify for each candidate
+    3. Claude reads the PDF, compares to DB, auto-corrects discrepancies
+    4. Report corrections made and any remaining issues
+
+    Targets:
+    - Invoices where line_items_total doesn't match total_amount (parsing errors)
+    - needs_review invoices (anomalies, low confidence)
+    - Recently parsed unsent invoices
+    """
+    findings: List[Finding] = []
+    candidate_ids = []
+
+    with hub_engine.connect() as conn:
+        # --- Total mismatch: line items don't add up to invoice total ---
+        rows = conn.execute(text("""
+            SELECT i.id, i.vendor_name, i.invoice_number, i.total_amount,
+                   i.line_items_total, i.status, i.pdf_path,
+                   ABS(COALESCE(i.line_items_total, 0) - COALESCE(i.total_amount, 0) + COALESCE(i.tax_amount, 0)) as diff
+            FROM hub_invoices i
+            WHERE i.status IN ('needs_review', 'mapping', 'ready')
+              AND i.pdf_path IS NOT NULL
+              AND COALESCE(i.sent_to_accounting, false) = false
+              AND COALESCE(i.sent_to_inventory, false) = false
+              AND i.is_statement = false
+              AND ABS(COALESCE(i.line_items_total, 0) - COALESCE(i.total_amount, 0) + COALESCE(i.tax_amount, 0)) > 0.50
+            ORDER BY diff DESC
+            LIMIT 20
+        """)).fetchall()
+
+        for r in rows:
+            candidate_ids.append((r[0], r[1], r[2], float(r[3] or 0)))
+
+        # --- needs_review invoices ---
+        rows = conn.execute(text("""
+            SELECT i.id, i.vendor_name, i.invoice_number, i.total_amount
+            FROM hub_invoices i
+            WHERE i.status = 'needs_review'
+              AND i.pdf_path IS NOT NULL
+              AND i.created_at >= :window
+            ORDER BY i.id DESC
+            LIMIT 20
+        """), {"window": review_window}).fetchall()
+
+        seen_ids = {c[0] for c in candidate_ids}
+        for r in rows:
+            if r[0] not in seen_ids:
+                candidate_ids.append((r[0], r[1], r[2], float(r[3] or 0)))
+
+    if not candidate_ids:
+        return findings
+
+    logger.info(f"PDF verification: {len(candidate_ids)} candidates to verify via Claude Vision")
+
+    # Call Hub verify endpoint for each candidate
+    import urllib.request
+    import urllib.error
+
+    for inv_id, vendor, inv_num, total in candidate_ids:
+        try:
+            url = f"{HUB_INTERNAL_URL}/api/invoices/{inv_id}/verify"
+            req = urllib.request.Request(
+                url, method="POST",
+                headers={"Content-Type": "application/json"},
+                data=b"{}",
+            )
+            resp = urllib.request.urlopen(req, timeout=180)
+            result = json.loads(resp.read().decode())
+
+            if not result.get("success"):
+                findings.append(Finding(
+                    section="pdf_verification", check_name="verify_error",
+                    severity="warning",
+                    title=f"Verification failed: {inv_num} ({vendor}) — {result.get('error', 'unknown')}",
+                    record_type="hub_invoice", record_id=inv_id,
+                ))
+                continue
+
+            corrections = result.get("corrections_count", 0)
+            verified = result.get("verification", {}).get("verified", False)
+            remaining = len(result.get("verification", {}).get("remaining_issues", []))
+
+            if corrections > 0 and verified:
+                # Auto-fixed and re-verified — success
+                correction_details = "; ".join(
+                    f"{c['field']}: {c.get('old')}→{c.get('new')}"
+                    for c in result.get("corrections", [])[:5]
+                )
+                findings.append(Finding(
+                    section="pdf_verification", check_name="auto_fixed",
+                    severity="info",
+                    title=(
+                        f"Auto-fixed: {inv_num} ({vendor}, ${total:.2f}) — "
+                        f"{corrections} corrections, re-verified OK"
+                    ),
+                    detail=correction_details,
+                    record_type="hub_invoice", record_id=inv_id,
+                ))
+            elif corrections > 0 and not verified:
+                # Fixed some things but still has issues
+                findings.append(Finding(
+                    section="pdf_verification", check_name="partial_fix",
+                    severity="warning",
+                    title=(
+                        f"Partially fixed: {inv_num} ({vendor}, ${total:.2f}) — "
+                        f"{corrections} corrections but {remaining} issues remain"
+                    ),
+                    record_type="hub_invoice", record_id=inv_id,
+                ))
+            elif corrections == 0 and not result.get("needs_attention"):
+                # Already correct
+                findings.append(Finding(
+                    section="pdf_verification", check_name="verified_ok",
+                    severity="info",
+                    title=f"Verified OK: {inv_num} ({vendor}, ${total:.2f}) — matches PDF",
+                    record_type="hub_invoice", record_id=inv_id,
+                ))
+            else:
+                # No corrections but still flagged
+                findings.append(Finding(
+                    section="pdf_verification", check_name="needs_manual_review",
+                    severity="warning",
+                    title=(
+                        f"Needs manual review: {inv_num} ({vendor}, ${total:.2f}) — "
+                        f"Claude couldn't resolve all discrepancies"
+                    ),
+                    record_type="hub_invoice", record_id=inv_id,
+                ))
+
+        except urllib.error.URLError as e:
+            logger.error(f"Failed to call Hub verify for invoice {inv_id}: {e}")
+            findings.append(Finding(
+                section="pdf_verification", check_name="verify_error",
+                severity="warning",
+                title=f"Hub API unreachable for {inv_num} ({vendor}): {str(e)[:80]}",
+                record_type="hub_invoice", record_id=inv_id,
+            ))
+        except Exception as e:
+            logger.error(f"Verification error for invoice {inv_id}: {e}")
+            findings.append(Finding(
+                section="pdf_verification", check_name="verify_error",
+                severity="warning",
+                title=f"Verification error: {inv_num} ({vendor}) — {str(e)[:80]}",
+                record_type="hub_invoice", record_id=inv_id,
+            ))
+
+    logger.info(
+        f"PDF verification complete: {len(candidate_ids)} invoices checked, "
+        f"{sum(1 for f in findings if f.check_name == 'auto_fixed')} auto-fixed"
+    )
+
+    return findings
+
+
+# ===================================================================
 # Report generation + email
 # ===================================================================
 
@@ -864,6 +1031,7 @@ def generate_report_html(findings: List[Finding], run_id: str, errors: List[str]
         "beverage_pricing": "Beverage Distributor Pricing",
         "linen_parse_quality": "Linen Service Parse Quality",
         "delivery_fee_completeness": "Delivery Fee Completeness",
+        "pdf_verification": "PDF Verification Candidates",
     }
 
     summary_rows = ""
@@ -1139,6 +1307,10 @@ def _daily_review_sync():
         # Section 5E — Delivery Fee Completeness (Hub)
         if hub_engine:
             findings.extend(_run_section("delivery_fee_completeness", check_delivery_fee_completeness, hub_engine, review_window))
+
+        # Section 5F — PDF Verification & Auto-Fix (Hub API + Claude Vision)
+        if hub_engine:
+            findings.extend(_run_section("pdf_verification", check_pdf_verification, hub_engine, review_window))
 
         # Persist findings to DB
         persist_findings(db, run_id, findings, errors)

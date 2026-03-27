@@ -10,11 +10,17 @@ The Accounting System is a comprehensive double-entry accounting platform provid
 
 ## Recent Updates
 
+### March 27, 2026 - Invoice PDF Verification & Auto-Fix (Claude Vision)
+- ✅ **Section 5F** — daily review auto-verifies invoices with parsing issues against original PDFs using Claude Sonnet Vision
+- ✅ **Auto-correction** — fixes item codes, quantities, unit prices, line totals; adds missing items
+- ✅ **Triple-check** — extract from PDF → compare & fix → re-extract to confirm corrections match
+- ✅ **Hub verify API** — `POST /api/invoices/{id}/verify` triggered by daily review and "Verify vs PDF" UI button
+
 ### March 26, 2026 - Daily Automated Accounting Review 🔥
 
 **Daily Review System:**
 - ✅ **Cross-system audit** — scans Accounting, Hub, and Inventory databases daily at 5 AM
-- ✅ **10 check categories** — invoice accuracy, GL integrity, inventory costs, duplicate detection, Hub↔Accounting sync, pipeline health, beverage pricing, linen parse quality, delivery fee completeness
+- ✅ **11 check categories** — invoice accuracy, GL integrity, inventory costs, duplicate detection, Hub↔Accounting sync, pipeline health, beverage pricing, linen parse quality, delivery fee completeness, PDF verification & auto-fix
 - ✅ **Email report** — HTML summary with critical/warning/info findings emailed to admin@swhgrp.com
 - ✅ **Finding persistence** — `daily_review_runs` and `daily_review_findings` tables track all findings
 - ✅ **Review spec** — `REVIEW_SPEC.md` defines all checks, auto-correction rules, duplicate resolution, and report format

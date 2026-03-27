@@ -49,6 +49,11 @@
                 <button class="btn btn-warning" onclick="reparseInvoice()" id="reparseBtn">
                     <i class="bi bi-arrow-clockwise"></i> Re-parse Invoice
                 </button>
+                {% if invoice.pdf_path and invoice.status not in ['sent', 'statement'] %}
+                <button class="btn btn-info" onclick="verifyAgainstPdf()" id="verifyBtn">
+                    <i class="bi bi-shield-check"></i> Verify vs PDF
+                </button>
+                {% endif %}
                 <button class="btn btn-primary" onclick="showEditModal()">
                     <i class="bi bi-pencil"></i> Edit Invoice
                 </button>
@@ -225,7 +230,7 @@
                                 <li>{{ flag }} on "{{ item_name }}"</li>
                                 {% endif %}
                             {% else %}
-                                <li>Item flagged: {{ parts[1] }}</li>
+                                <li>Item flagged: "{{ parts[1] }}" — item code not in vendor catalog or needs verification</li>
                             {% endif %}
                             {% elif reason.startswith('low_confidence:') %}
                             <li>Low-confidence mappings ({{ reason.split(':')[1] }})</li>
@@ -1072,6 +1077,47 @@ async function reparseInvoice() {
             button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-parse Invoice';
         }
     });
+}
+
+async function verifyAgainstPdf() {
+    if (!await showConfirm('Verify this invoice against the original PDF?\n\nThis will use AI to re-read the PDF, compare against the current data, and auto-correct any discrepancies found.\n\nThis takes 30-60 seconds.')) return;
+    const button = document.getElementById('verifyBtn');
+    if (button) { button.disabled = true; button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verifying...'; }
+    try {
+        const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/verify`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'}
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+            const corrections = result.corrections_count || 0;
+            const verified = result.verification?.verified;
+            let msg = '';
+            if (corrections === 0) {
+                msg = 'Invoice data matches the PDF — no corrections needed.';
+            } else {
+                msg = `${corrections} correction(s) applied.\n\n`;
+                result.corrections.forEach(c => {
+                    msg += `• ${c.field}: "${c.old}" → "${c.new}" (${c.description?.substring(0,30)})\n`;
+                });
+                if (verified) {
+                    msg += '\nRe-verification: PASSED';
+                } else {
+                    msg += '\nRe-verification: Some items may still need manual review.';
+                }
+            }
+            if (result.auto_send_triggered) {
+                msg += '\n\nInvoice is now ready and auto-send has been triggered.';
+            }
+            await showAlert(msg, corrections > 0 ? 'Corrections Applied' : 'Verification Complete');
+            if (corrections > 0) location.reload();
+        } else {
+            await showAlert(result.detail || result.error || 'Verification failed', 'Error');
+        }
+    } catch (error) {
+        await showAlert(`Network error: ${error.message}`, 'Error');
+    } finally {
+        if (button) { button.disabled = false; button.innerHTML = '<i class="bi bi-shield-check"></i> Verify vs PDF'; }
+    }
 }
 
 function toggleNewVendorInput() {
